@@ -1,0 +1,9 @@
+.target-div {
+    transition: opacity 300ms ease-in-out 100ms;
+    opacity: 0%;
+}
+
+.trigger-div:hover + .target-div {
+    transition: opacity 300ms ease-in-out 500ms;
+    opacity: 100%;
+}

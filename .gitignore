@@ -1,0 +1,5 @@
+target/
+dist/
+Cargo.lock
+tailwind.css
+src-tauri/icons/*.*
