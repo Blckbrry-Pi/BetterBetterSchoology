@@ -1,6 +1,8 @@
 use std::{collections::HashMap, sync::Arc};
 
 use bbs_shared::{ data::ClassEntry, ClassID };
+use keyring::Entry;
+use reqwest_cookie_store::CookieStoreMutex;
 use tauri::State;
 use reqwest::{Client, Method};
 
@@ -17,11 +19,23 @@ pub async fn set_credentials(creds: State<'_, Credentials>, username: String, pa
 
 
 #[tauri::command]
-pub async fn get_class_listing(client: State<'_, Client>, selectors: State<'_, Selectors>, creds: State<'_, Credentials>) -> Result<String, String> {
+pub async fn get_class_listing(
+    client: State<'_, Client>,
+    selectors: State<'_, Selectors>,
+    creds: State<'_, Credentials>,
+    cookie_jar: State<'_, Arc<CookieStoreMutex>>,
+    keyring_entry: State<'_, Entry>,
+) -> Result<String, String> {
     match get_login_page(&client, &selectors).await
         .map_err(|err| err.to_string()) {
         Ok(login_form_details) => {
-            login(&client, creds, login_form_details).await?;
+            login(
+                &client,
+                creds,
+                cookie_jar,
+                keyring_entry,
+                login_form_details,
+            ).await?;
         },
         Err(_) => (),
     };

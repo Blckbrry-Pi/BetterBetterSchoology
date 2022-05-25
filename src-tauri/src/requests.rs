@@ -1,6 +1,8 @@
-use std::{error::Error, collections::HashMap, borrow::Cow, fmt::Display, ops::Deref};
+use std::{error::Error, collections::HashMap, borrow::Cow, fmt::Display, ops::Deref, sync::Arc};
 
+use keyring::Entry;
 use reqwest::{Client, Response, Method};
+use reqwest_cookie_store::CookieStoreMutex;
 use scraper::{Html, Selector};
 use serde::Serialize;
 use tauri::State;
@@ -79,7 +81,13 @@ pub async fn get_login_page(client: &State<'_, Client>, selectors: &State<'_, Se
     })
 }
 
-pub async fn login(client: &State<'_, Client>, creds: State<'_, Credentials>, login_form_details: LoginFormDetails) -> Result<Response, String> {
+pub async fn login(
+    client: &State<'_, Client>,
+    creds: State<'_, Credentials>,
+    cookie_jar: State<'_, Arc<CookieStoreMutex>>,
+    keyring_entry: State<'_, Entry>,
+    login_form_details: LoginFormDetails,
+) -> Result<Response, String> {
     let form: Vec<(String, String)> = login_form_details
         .inputs()
         .iter()
@@ -128,6 +136,18 @@ pub async fn login(client: &State<'_, Client>, creds: State<'_, Credentials>, lo
             let status = res.status();
             
             if status.is_success() {
+                match cookie_jar.lock() {
+                    Ok(inner_jar) => {
+                        match bincode::serialize(&inner_jar.iter_unexpired().collect::<Vec<_>>()) {
+                            Ok(serialized_value)  => {
+                                let base_64_value = base64::encode(serialized_value);
+                                keyring_entry.set_password(&base_64_value).unwrap();
+                            }
+                            Err(e) => eprintln!("Failed to serialize cookies into binary: {}", e),
+                        }
+                    },
+                    Err(e) => eprintln!("Failed to get lock on cookie jar: {}", e),
+                }
                 Ok(res)
             } else {
                 let text = res.text().await;
