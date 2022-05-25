@@ -11,10 +11,29 @@ use crate::{requests::{get_login_page, Selectors, login, make_api_request}, Cred
 
 
 #[tauri::command]
-pub async fn set_credentials(creds: State<'_, Credentials>, username: String, password: String) -> Result<(), ()> {
-    creds.username.lock().unwrap().clone_from(&Arc::new(username));
-    creds.password.lock().unwrap().clone_from(&Arc::new(password));
-    Ok(())
+pub async fn set_credentials(creds: State<'_, Credentials>, username: String, password: String) -> Result<(), String> {
+    match (creds.username.lock(), creds.password.lock()) {
+        (Ok(mut username_lock), Ok(mut password_lock)) => {
+            username_lock.clone_from(&Arc::new(username));
+            password_lock.clone_from(&Arc::new(password));
+            Ok(())
+        },
+
+        (Err(username_error), Ok(_)) => {
+            eprintln!("Failed to get lock on username: {:#?}", username_error);
+            Err("CredSetErr".to_string())
+        },
+
+        (Ok(_), Err(password_error)) => {
+            eprintln!("Failed to get lock on password: {:#?}", password_error);
+            Err("CredSetErr".to_string())
+        },
+
+        (Err(username_error), Err(password_error)) => {
+            eprintln!("Failed to get lock on username and password: {:#?} {:#?}", username_error, password_error);
+            Err("CredSetErr".to_string())
+        },
+    }
 }
 
 

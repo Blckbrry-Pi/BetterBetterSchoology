@@ -124,7 +124,7 @@ pub async fn login(
     let response = match login_form_details.method().as_str() {
         "post" => client.post(format!("https://bca.schoology.com{}", login_form_details.action())).form(&form),
         "get"  => client.get (format!("https://bca.schoology.com{}", login_form_details.action())),
-        _ => unreachable!("Invalid method form method: `{}`!", login_form_details.method()),
+        _ => unimplemented!("Invalid method form method: `{}`!", login_form_details.method()),
     }
         .send()
         .await;
@@ -141,7 +141,9 @@ pub async fn login(
                         match bincode::serialize(&inner_jar.iter_unexpired().collect::<Vec<_>>()) {
                             Ok(serialized_value)  => {
                                 let base_64_value = base64::encode(serialized_value);
-                                keyring_entry.set_password(&base_64_value).unwrap();
+                                if let Err(e) = keyring_entry.set_password(&base_64_value) {
+                                    eprintln!("Keyring failed to save password: {}", e);
+                                }
                             }
                             Err(e) => eprintln!("Failed to serialize cookies into binary: {}", e),
                         }
@@ -177,4 +179,3 @@ where
         .send()
         .await
 }
-
