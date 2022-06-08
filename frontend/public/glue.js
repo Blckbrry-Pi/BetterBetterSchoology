@@ -9,3 +9,7 @@ export async function invokeGetClassListing() {
 export async function invokeSetCredentials(username, password) {
     return await invoke("set_credentials", { username, password });
 }
+
+export async function parseSingleClassInfo(classid) {
+    return await invoke("parse_single_class_info", { classid });
+}

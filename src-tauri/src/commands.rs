@@ -6,9 +6,7 @@ use reqwest_cookie_store::CookieStoreMutex;
 use tauri::State;
 use reqwest::{Client, Method};
 
-use crate::{requests::{get_login_page, Selectors, login, make_api_request}, Credentials, structs::ActiveClasses};
-
-
+use crate::{requests::{get_login_page, Selectors, login, make_api_request, get_single_class}, Credentials, structs::ActiveClasses};
 
 #[tauri::command]
 pub async fn set_credentials(creds: State<'_, Credentials>, username: String, password: String) -> Result<(), String> {
@@ -93,4 +91,25 @@ pub async fn get_class_listing(
             bincode::serialize(&courses).map_err(|e| format!("%{}", e))?
         )
     )
+}
+
+#[tauri::command]
+pub async fn parse_single_class_info(client: State<'_, Client>, classid: String) -> Result<String, String> {
+    match get_single_class(&*client, classid).await {
+        Ok(res) => {
+            let single_class_complete = res.text().await.unwrap();
+            
+            println!(single_class_complete)
+            Ok(body) {
+                // todo make this take listing of course assignments and return it
+                base64::encode(
+                    bincode::serialize(&courses).map_err(|e| format!("%{}", e))?
+                )
+
+            }
+
+            
+        },
+        Err(e) => Err(e.to_string()),
+    }
 }

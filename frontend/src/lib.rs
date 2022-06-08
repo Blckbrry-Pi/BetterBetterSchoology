@@ -206,5 +206,6 @@ extern "C" {
     pub async fn get_class_listing_foreign() -> Result<JsValue, JsValue>;
     #[wasm_bindgen(js_name = invokeSetCredentials, catch)]
     pub async fn set_credentials_foreign(username: String, password: String) -> Result<(), JsValue>;
-    
+    #[wasm_bindgen(js_name = parseSingleClassInfo, catch)]
+    pub async fn parse_single_class_info(classid: String) -> Result<JsValue, JsValue>;
 }

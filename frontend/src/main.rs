@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use bbs_shared::StateUpdateAction;
 use bbs_shared::{ PageState, FrontendData, DataUpdateAction, data::SectionDataGuts };
-use frontend::MainPageClass;
+use frontend::{MainPageClass, parse_single_class_info};
 use frontend::LoginPage;
 use frontend::{Breadcrumb, Breadcrumbs};
 
@@ -25,6 +25,8 @@ fn main() {
 
 #[function_component(App)]
 pub fn app() -> Html {
+    spawn_local(async { parse_single_class_info("5271245315".into()).await.unwrap(); });
+
     let app_state = use_reducer_eq(|| PageState::Login {
         username: String::new(),
         password: String::new(),
@@ -89,14 +91,14 @@ pub fn app() -> Html {
             let breadcrumbs = if let Some(day) = day {
                 html! {
                     <Breadcrumbs>
-                        <Breadcrumb text="Home" on_click_callback={home_callback} has_next=true key=0/>
-                        <Breadcrumb text={DAY_NAMES[*day].to_string()} on_click_callback={Callback::<()>::from(|_| ())} key=1/>
+                        <Breadcrumb text="Home" on_click_callback={home_callback} has_next=true key=0u8/>
+                        <Breadcrumb text={DAY_NAMES[*day].to_string()} on_click_callback={Callback::<()>::from(|_| ())} key=1u8/>
                     </Breadcrumbs>
                 }
             } else {
                 html! {
                     <Breadcrumbs>
-                        <Breadcrumb text="Home" on_click_callback={home_callback} key=0/>
+                        <Breadcrumb text="Home" on_click_callback={home_callback} key=0u8/>
                     </Breadcrumbs>
                 }
             };

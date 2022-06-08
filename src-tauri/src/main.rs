@@ -12,9 +12,7 @@ use cookie_store::{CookieStore, Cookie};
 use reqwest_cookie_store::CookieStoreMutex;
 use app::{commands::*, requests::Selectors, Credentials};
 
-
 fn main() {
-    
     let keyring_entry = Entry::new("dev.skyc.betterbetterschoology.cookies", "default");
     let mut raw_cookie_store = CookieStore::default();
 
@@ -42,10 +40,8 @@ fn main() {
     
     let client = Client::builder().cookie_provider(final_cookie_jar_client).build().unwrap();
 
-
-
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![get_class_listing, set_credentials])
+        .invoke_handler(tauri::generate_handler![get_class_listing, set_credentials, parse_single_class_info])
         .manage(client)
         .manage(Selectors::default())
         .manage(Credentials::default())
