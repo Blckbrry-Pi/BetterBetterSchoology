@@ -10,21 +10,12 @@ use derive_getters::Getters;
 
 use crate::Credentials;
 
-#[derive(Getters)]
-pub struct Selectors {
-    login_form: Selector,
-    login_input: Selector,
+lazy_static::lazy_static! {
+    static ref LOGIN_FORM: Selector = Selector::parse("form#s-user-login-form").unwrap();
+    static ref LOGIN_INPUT: Selector = Selector::parse("input").unwrap();
 }
 
 
-impl Default for Selectors {
-    fn default() -> Self {
-        Self {
-            login_form: Selector::parse("form#s-user-login-form").unwrap(),
-            login_input: Selector::parse("input").unwrap(),
-        }
-    }
-}
 
 #[derive(Getters, Debug, Clone)]
 pub struct LoginFormDetails {
@@ -45,7 +36,7 @@ impl Display for NotFoundError {
 
 impl Error for NotFoundError {}
 
-pub async fn get_login_page(client: &State<'_, Client>, selectors: &State<'_, Selectors>) -> Result<LoginFormDetails, Box<dyn Error + Send + Sync>> {
+pub async fn get_login_page(client: &Client) -> Result<LoginFormDetails, Box<dyn Error + Send + Sync>> {
     let output = client
         .get("https://bca.schoology.com")
         .send()
@@ -54,7 +45,7 @@ pub async fn get_login_page(client: &State<'_, Client>, selectors: &State<'_, Se
     let text = res.text().await?;
     let document = Html::parse_document(&text);
     
-    let forms = document.select(selectors.login_form());
+    let forms = document.select(&LOGIN_FORM);
 
     let form_node = match forms.last() {
         Some(node) => node,
@@ -65,7 +56,7 @@ pub async fn get_login_page(client: &State<'_, Client>, selectors: &State<'_, Se
     let action = form_node.value().attr("action").unwrap().to_owned();
 
     let inputs = form_node
-        .select(selectors.login_input())
+        .select(&LOGIN_INPUT)
         .map(|element_ref| element_ref.value())
         .map(|element| element
             .attrs()
@@ -82,10 +73,10 @@ pub async fn get_login_page(client: &State<'_, Client>, selectors: &State<'_, Se
 }
 
 pub async fn login(
-    client: &State<'_, Client>,
+    client: &Client,
     creds: State<'_, Credentials>,
-    cookie_jar: State<'_, Arc<CookieStoreMutex>>,
-    keyring_entry: State<'_, Entry>,
+    cookie_jar: &Arc<CookieStoreMutex>,
+    keyring_entry: State<'_, Option<Entry>>,
     login_form_details: LoginFormDetails,
 ) -> Result<Response, String> {
     let form: Vec<(String, String)> = login_form_details
@@ -141,8 +132,10 @@ pub async fn login(
                         match bincode::serialize(&inner_jar.iter_unexpired().collect::<Vec<_>>()) {
                             Ok(serialized_value)  => {
                                 let base_64_value = base64::encode(serialized_value);
-                                if let Err(e) = keyring_entry.set_password(&base_64_value) {
-                                    eprintln!("Keyring failed to save password: {}", e);
+                                if let Some(keyring_entry) = &*keyring_entry {
+                                    if let Err(e) = keyring_entry.set_password(&base_64_value) {
+                                        eprintln!("Keyring failed to save password: {}", e);
+                                    }
                                 }
                             }
                             Err(e) => eprintln!("Failed to serialize cookies into binary: {}", e),
@@ -165,7 +158,7 @@ pub async fn login(
 }
 
 pub async fn make_api_request<T>(
-    client: &State<'_, Client>,
+    client: &Client,
     method: Method,
     route: &str,
     body: &T,
@@ -179,3 +172,7 @@ where
         .send()
         .await
 }
+
+// pub async fn get_single_class(client: &State<'_, Client>, class_id: String) -> Result<Response, reqwest::Error> {
+//     client.get(format!("https://bca.schoology.com/course/{}/materials", class_id)).send().await
+// }

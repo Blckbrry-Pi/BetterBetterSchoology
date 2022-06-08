@@ -29,7 +29,7 @@ pub fn login_page(props: &LoginDataPageProps) -> Html {
     let app_state_for_uname = state.clone();
     let app_state_for_passw = state.clone();
 
-    let app_state_for_entering = state.clone();
+    let app_state_for_entering = state;
 
     let user_change_event = move |event: yew::events::InputEvent| {
         app_state_for_uname.dispatch(

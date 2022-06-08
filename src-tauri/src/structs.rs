@@ -1,5 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
+use reqwest::Client;
+use reqwest_cookie_store::CookieStoreMutex;
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,6 +73,13 @@ pub struct ActiveClassesPermissions {
     pub school_has_grading_periods: bool,
 }
 
+#[derive(Debug)]
 pub struct ClassesById {
     pub data: HashMap<u64, (ActiveClassesCourse, ActiveClassesSection)>,
+}
+
+#[derive(Debug)]
+pub struct AugClient {
+    pub client: Client,
+    pub cookies: Arc<CookieStoreMutex>,
 }

@@ -46,7 +46,6 @@ impl Reducible for PageState {
 
 
 pub enum DataUpdateAction {
-
     ClearClassListing,
     SetClassListing(Vec<ClassEntry>),
     ClearClassPageInfo,
@@ -59,11 +58,34 @@ impl Reducible for FrontendData {
     type Action = DataUpdateAction;
     fn reduce(self: Rc<Self>, action: Self::Action) -> Rc<Self> {
         match action {
-            ClearClassListing => *self.classes.borrow_mut() = None,
-            SetClassListing(class_entries) => *self.classes.borrow_mut() = Some(class_entries),
-            ClearClassPageInfo => *self.curr_class_data.borrow_mut() = None,
-            SetClassPageInfo(class_page_data) => *self.curr_class_data.borrow_mut() = Some(class_page_data),
+            ClearClassListing => {
+                *self.classes.borrow_mut() = None;
+                Rc::new(FrontendData {
+                    classes: self.classes.new_inc_clone(),
+                    curr_class_data: self.curr_class_data.clone(),
+                })
+            },
+            SetClassListing(class_entries) => {
+                *self.classes.borrow_mut() = Some(class_entries);
+                Rc::new(FrontendData {
+                    classes: self.classes.new_inc_clone(),
+                    curr_class_data: self.curr_class_data.clone(),
+                })
+            },
+            ClearClassPageInfo => {
+                *self.curr_class_data.borrow_mut() = None;
+                Rc::new(FrontendData {
+                    classes: self.classes.clone(),
+                    curr_class_data: self.curr_class_data.new_inc_clone(),
+                })
+            },
+            SetClassPageInfo(class_page_data) => {
+                *self.curr_class_data.borrow_mut() = Some(class_page_data);
+                Rc::new(FrontendData {
+                    classes: self.classes.clone(),
+                    curr_class_data: self.curr_class_data.new_inc_clone(),
+                })
+            },
         }
-        self
     }
 }

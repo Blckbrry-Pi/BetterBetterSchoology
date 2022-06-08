@@ -1,6 +1,9 @@
-const invoke = window.__TAURI__.invoke
+/**
+ * @type {typeof import("@tauri-apps/api")}
+ */
+const tauri = window.__TAURI__;
 
-alert(window.__TAURI__)
+const invoke = tauri.invoke;
 
 export async function invokeGetClassListing() {
     return await invoke("get_class_listing");
