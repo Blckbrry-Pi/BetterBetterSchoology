@@ -1,8 +1,10 @@
 use std::ops::Deref;
 
+use bbs_shared::StateUpdateAction;
 use bbs_shared::{ PageState, FrontendData, DataUpdateAction, data::SectionDataGuts };
 use frontend::MainPageClass;
 use frontend::LoginPage;
+use frontend::{Breadcrumb, Breadcrumbs};
 
 use bincode::deserialize;
 use base64::decode;
@@ -13,6 +15,8 @@ use yew::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
 use web_sys::window;
+
+static DAY_NAMES: [&str; 7] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 fn main() {
     yew::start_app::<App>();
@@ -25,6 +29,7 @@ pub fn app() -> Html {
         username: String::new(),
         password: String::new(),
     });
+
     let app_data = use_reducer(|| FrontendData::empty());
 
     {
@@ -36,6 +41,10 @@ pub fn app() -> Html {
             );
         }
     }
+
+    let home_callback_app_state = app_state.clone();
+
+    let home_callback: Callback<()> = (move |_| home_callback_app_state.dispatch(StateUpdateAction::ToMain)).into();
 
     use PageState::{ Main, Login, LoginFailed, ClassPage, ClassItemPage };
 
@@ -76,9 +85,25 @@ pub fn app() -> Html {
                     <h1>{"Loading..."}</h1>
                 },
             };
+
+            let breadcrumbs = if let Some(day) = day {
+                html! {
+                    <Breadcrumbs>
+                        <Breadcrumb text="Home" on_click_callback={home_callback} has_next=true key=0/>
+                        <Breadcrumb text={DAY_NAMES[*day].to_string()} on_click_callback={Callback::<()>::from(|_| ())} key=1/>
+                    </Breadcrumbs>
+                }
+            } else {
+                html! {
+                    <Breadcrumbs>
+                        <Breadcrumb text="Home" on_click_callback={home_callback} key=0/>
+                    </Breadcrumbs>
+                }
+            };
+
             html! {
                 <div>
-                    <h2>{"Home:"}</h2>
+                    {breadcrumbs}
                     {class_html}
                 </div>
             }

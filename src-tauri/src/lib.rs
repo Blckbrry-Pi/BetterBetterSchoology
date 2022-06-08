@@ -21,6 +21,4 @@ impl Default for Credentials {
 }
 
 
-unsafe impl Sync for Credentials {
-
-}
+unsafe impl Sync for Credentials {}

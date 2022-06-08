@@ -1,12 +1,13 @@
 pub mod login;
+pub mod breadcrumbs;
 
 use bbs_shared::{data::{ClassEntry, SectionData, SectionDataGuts}, PageState, StateUpdateAction};
-use const_format::concatcp;
 use yew::{function_component, Properties, html, Html, use_context, UseReducerHandle};
 use wasm_bindgen::{prelude::*};
 
-pub use login::LoginPage;
+pub use {login::LoginPage, breadcrumbs::{Breadcrumb, Breadcrumbs}};
 
+#[macro_export]
 macro_rules! build_classes {
     ()=>{""};
     ($($arg: expr),* $(,)?)=>(
@@ -24,17 +25,16 @@ pub struct MainPageClassProps {
     pub enabled: bool,
 }
 
-const BOX_BASE: &str = concatcp!(
-    "w-4 h-4 ",
-    "inline-block ",
-    "m-1.5px ",
-    "rounded-sm ",
+const BOX_BASE: &str = build_classes!(
+    "w-4 h-4",
+    "inline-block",
+    "m-1.5px",
+    "rounded-sm",
 );
 
 const BOX_ANIM: &str = build_classes!(
     "scale-100",
     "hover:scale-110",
-
     "transition-all",
     "duration-150",
     "hover:duration-75",
