@@ -173,6 +173,6 @@ where
         .await
 }
 
-// pub async fn get_single_class(client: &State<'_, Client>, class_id: String) -> Result<Response, reqwest::Error> {
-//     client.get(format!("https://bca.schoology.com/course/{}/materials", class_id)).send().await
-// }
+pub async fn get_single_class(client: &Client, classid: String) -> Result<Response, reqwest::Error> {
+    client.get(format!("https://bca.schoology.com/course/{}/materials", classid)).send().await
+}

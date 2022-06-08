@@ -10,3 +10,4 @@ node_modules
 *-base64.txt
 *.p12
 signing/
+.DS_Store

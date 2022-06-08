@@ -19,7 +19,6 @@ const ENABLE_KEYRING: bool = false;
 #[cfg(not(debug_assertions))]
 const ENABLE_KEYRING: bool = true;
 
-
 fn main() {
     let keyring_entry = ENABLE_KEYRING.then(|| Entry::new("dev.skyc.betterbetterschoology.cookies", "default"));
     let mut raw_cookie_store = CookieStore::default();
@@ -52,9 +51,8 @@ fn main() {
         cookies: final_cookie_jar_state
     };
 
-
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![get_class_listing, set_credentials])
+        .invoke_handler(tauri::generate_handler![get_class_listing, set_credentials, parse_single_class_info])
         .manage(augmented_client)
         .manage(Credentials::default())
         .manage(keyring_entry)

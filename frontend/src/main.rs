@@ -4,14 +4,15 @@ use bbs_shared::StateUpdateAction;
 use bbs_shared::data::ClassEntry;
 use bbs_shared::{ PageState, FrontendData, DataUpdateAction };
 
-use frontend::{MainPage, reducer_contexts};
+use frontend::{MainPage};
 use frontend::LoginPage;
 use frontend::{Breadcrumb, Breadcrumbs};
 
 use bincode::deserialize;
 use base64::decode;
 
-use frontend::get_class_listing_foreign;
+use frontend::{get_class_listing_foreign, parse_single_class_info, reducer_contexts};
+
 use wasm_bindgen::JsValue;
 use yew::prelude::*;
 
@@ -28,6 +29,8 @@ fn main() {
 
 #[function_component(App)]
 pub fn app() -> Html {
+    spawn_local(async { parse_single_class_info("5271245315".into()).await.unwrap(); });
+
     let app_state = use_reducer_eq(|| PageState::Login {
         username: String::new(),
         password: String::new(),

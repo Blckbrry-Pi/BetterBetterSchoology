@@ -5,9 +5,7 @@ use keyring::Entry;
 use tauri::State;
 use reqwest::Method;
 
-use crate::{requests::{get_login_page, login, make_api_request}, Credentials, structs::{ActiveClasses, AugClient}};
-
-
+use crate::{requests::{get_login_page, login, make_api_request, get_single_class}, Credentials, structs::{ActiveClasses, AugClient}};
 
 #[tauri::command]
 pub async fn set_credentials(creds: State<'_, Credentials>, username: String, password: String) -> Result<(), String> {
@@ -74,7 +72,7 @@ pub async fn get_class_listing(
     };
 
     let active_courses_text = make_api_request(
-        client,
+        &client,
         Method::GET,
         "/iapi/course/active",
         &HashMap::<(), ()>::new(),
@@ -85,7 +83,8 @@ pub async fn get_class_listing(
         .await
         .map_err(|e| e.to_string())?;
 
-    let active: ActiveClasses = serde_json::from_str(&active_courses_text).map_err(|e| e.to_string())?;
+    
+    let active: ActiveClasses = serde_json::from_str(active_courses_text.as_ref()).map_err(|e| e.to_string())?;
 
     let course_listing = active.body.courses.to_by_id();
 
@@ -127,23 +126,21 @@ pub async fn get_class_listing(
     Ok(encoded_output)
 }
 
-// #[tauri::command]
-// pub async fn parse_single_class_info(client: State<'_, Client>, class_id: String) -> Result<ClassEntry, String> {
-//     match get_single_class(&client, class_id).await {
-//         Ok(res) => {
-//             let body = res.text().await.unwrap();
-//             println!("{}", body);
+#[tauri::command]
+pub async fn parse_single_class_info(client: State<'_, AugClient>, classid: String) -> Result<String, String> {
+    match get_single_class(&client.client, classid).await {
+        Ok(res) => {
+            let single_class_complete = res.text().await.unwrap();
+            Ok({
+                // todo make this take listing of course assignments and return it
+                base64::encode(
+                    bincode::serialize(&single_class_complete).map_err(|e| format!("%{}", e))?
+                )
 
-//             // let selectors = Selectors::default();
-//             // let class_name = body.split(selectors.class_name).nth(1).unwrap().split(selectors.class_name_end).next().unwrap();
-//             // let class_id = body.split(selectors.class_id).nth(1).unwrap().split(selectors.class_id_end).next().unwrap();
-//             // Ok(ClassEntry {
-//             //     class_id: ClassID::from_str(class_id).unwrap(),
-//             //     class_name: class_name.to_owned(),
-//             // })
+            })
+
             
-//             unimplemented!();
-//         },
-//         Err(e) => Err(e.to_string()),
-//     }
-// }
+        },
+        Err(e) => Err(e.to_string()),
+    }
+}
