@@ -1,11 +1,12 @@
-use std::sync::{Arc, Mutex};
-
-
 pub mod commands;
 pub mod requests;
 pub mod structs;
 
-#[derive(Debug)]
+use std::sync::{Arc, Mutex};
+use serde::{Serialize, Deserialize};
+
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Credentials {
     username: Mutex<Arc<String>>,
     password: Mutex<Arc<String>>,
@@ -22,3 +23,5 @@ impl Default for Credentials {
 
 
 unsafe impl Sync for Credentials {}
+
+

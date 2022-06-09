@@ -1,46 +1,54 @@
 use std::ops::Deref;
 
 use bbs_shared::StateUpdateAction;
-use bbs_shared::{ PageState, FrontendData, DataUpdateAction, data::SectionDataGuts };
-use frontend::{MainPageClass, parse_single_class_info};
+use bbs_shared::data::ClassEntry;
+use bbs_shared::{ PageState, FrontendData, DataUpdateAction };
+
+use frontend::{MainPage};
 use frontend::LoginPage;
 use frontend::{Breadcrumb, Breadcrumbs};
 
 use bincode::deserialize;
 use base64::decode;
 
-use frontend::get_class_listing_foreign;
+use frontend::{get_class_listing_foreign, parse_single_class_info, reducer_contexts};
+
+use wasm_bindgen::JsValue;
 use yew::prelude::*;
 
 use wasm_bindgen_futures::spawn_local;
 
-use web_sys::window;
+use web_sys::{window, console};
 
 static DAY_NAMES: [&str; 7] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 fn main() {
+    console_error_panic_hook::set_once();
     yew::start_app::<App>();
 }
 
-
 #[function_component(App)]
 pub fn app() -> Html {
-    spawn_local(async { parse_single_class_info("5271245315".into()).await.unwrap(); });
+    spawn_local(async { parse_single_class_info("5202064601".into()).await.unwrap(); });
 
     let app_state = use_reducer_eq(|| PageState::Login {
         username: String::new(),
         password: String::new(),
     });
 
-    let app_data = use_reducer(|| FrontendData::empty());
+    let app_data = use_reducer_eq(FrontendData::empty);
 
     {
         if app_state.is_main() {
             let app_data = app_data.clone();
+            let app_data2 = app_data.clone();
             use_effect_with_deps(
-                move |_| get_class_listing(app_data),
+                move |_| get_class_listing(
+                    Callback::from(move |new_data| app_data2.dispatch(DataUpdateAction::SetClassListing(new_data)))
+                ),
                 ()
             );
+
         }
     }
 
@@ -63,31 +71,6 @@ pub fn app() -> Html {
         },
 
         Main { day } => {
-            let classes_ref =  app_data.classes.borrow();
-            let class_html = match classes_ref.as_ref() {
-                Some(a) => html! {
-                    {
-                        a
-                            .iter()
-                            .map(|entry| (
-                                entry,
-                                if let Some(day) = day {
-                                    if let SectionDataGuts::Good { days, .. } = entry.section.guts {
-                                        days[*day]
-                                    } else {false}
-                                } else {true}
-                            ))
-                            .map(|(entry, enabled)| html! {
-                                <MainPageClass entry={entry.clone()} enabled={enabled} key={entry.id.0}/>
-                            })
-                            .collect::<Html>()
-                    }
-                },
-                None => html! {
-                    <h1>{"Loading..."}</h1>
-                },
-            };
-
             let breadcrumbs = if let Some(day) = day {
                 html! {
                     <Breadcrumbs>
@@ -102,11 +85,12 @@ pub fn app() -> Html {
                     </Breadcrumbs>
                 }
             };
-
+            console::log_1(&JsValue::from_str(&format!("{:?}", app_data.classes)));
+            console::log_1(&JsValue::from_bool(app_data.classes == FrontendData::empty().classes));
             html! {
                 <div>
                     {breadcrumbs}
-                    {class_html}
+                    <MainPage day={*day} classes={app_data.classes.clone()} />
                 </div>
             }
         },
@@ -130,19 +114,25 @@ pub fn app() -> Html {
         },
     };
 
-    html! {
-        <ContextProvider<UseReducerHandle<PageState>> context={app_state.clone()}>
-            <div class={"h-screen bg-slate-800 text-white overflow-scroll pl-7"}>
-                 {inner}
-            </div>
-        </ContextProvider<UseReducerHandle<PageState>>>
-    }
-
+    // html! {
+    //     <ReducCtx<PageState> context={app_state.clone()}>
+    //         <ReducCtx<FrontendData> context={app_data.clone()}>
+    //             <div class={"h-screen bg-slate-800 text-white overflow-scroll pl-7"}>
+    //                 {inner}
+    //             </div>
+    //         </ReducCtx<FrontendData>>
+    //     </ReducCtx<PageState>>
+    // }
     
+    reducer_contexts! { PageState: app_state /* ,  FrontendData: app_data */ =>
+        <div class={"h-screen bg-slate-800 text-white overflow-scroll pl-7"}>
+            {inner}
+        </div>
+    }
 }
 
-fn get_class_listing(data_handle: UseReducerHandle<FrontendData>) -> impl FnOnce() -> () {
-    async fn get_class_listing_guts(data_handle: UseReducerHandle<FrontendData>) {
+fn get_class_listing(data_handle: Callback<Vec<ClassEntry>>) -> impl FnOnce() {
+    async fn get_class_listing_guts(data_handle: Callback<Vec<ClassEntry>>) {
         let opt_str = match get_class_listing_foreign().await {
             Ok(val) => val.as_string(),
             Err(err) => {
@@ -162,8 +152,8 @@ fn get_class_listing(data_handle: UseReducerHandle<FrontendData>) -> impl FnOnce
         let data_buf = match decode(&data_str) {
             Ok(buf) => buf,
             Err(err) => {
-                let window = window().unwrap();
-                window
+                window()
+                    .unwrap()
                     .alert_with_message(&format!("Text: {}\nError: {:?}", &data_str, err))
                     .unwrap();
                 return;
@@ -172,11 +162,11 @@ fn get_class_listing(data_handle: UseReducerHandle<FrontendData>) -> impl FnOnce
 
         match deserialize(&data_buf) {
             Ok(des_state) => {
-                data_handle.dispatch(DataUpdateAction::SetClassListing(des_state));
+                data_handle.emit(des_state);
             }
             Err(err) => {
-                let window = window().unwrap();
-                window
+                window()
+                    .unwrap()
                     .alert_with_message(&format!("Text: {}\nError: {:?}", &data_str, err))
                     .unwrap();
             }

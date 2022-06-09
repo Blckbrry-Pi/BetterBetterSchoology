@@ -1,13 +1,13 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::SystemTime};
 
-use bbs_shared::{ data::ClassEntry, ClassID };
+use bbs_shared::{ data::ClassEntry, ClassID, cache::{BackendCache, CacheDataState} };
 use keyring::Entry;
-use reqwest_cookie_store::CookieStoreMutex;
 use tauri::State;
 use reqwest::{Client, Method};
 use scraper::{Html, Selector};
 
-use crate::{requests::{get_login_page, Selectors, login, make_api_request, get_single_class, get_assignment_page}, Credentials, structs::ActiveClasses};
+use crate::{requests::{get_login_page, login, make_api_request, get_single_class, get_assignment_page}, Credentials, structs::{ActiveClasses, AugClient}};
+
 
 #[tauri::command]
 pub async fn set_credentials(creds: State<'_, Credentials>, username: String, password: String) -> Result<(), String> {
@@ -38,17 +38,32 @@ pub async fn set_credentials(creds: State<'_, Credentials>, username: String, pa
 
 #[tauri::command]
 pub async fn get_class_listing(
-    client: State<'_, Client>,
-    selectors: State<'_, Selectors>,
+    aug_client: State<'_, AugClient>,
     creds: State<'_, Credentials>,
-    cookie_jar: State<'_, Arc<CookieStoreMutex>>,
-    keyring_entry: State<'_, Entry>,
+    cache: State<'_, BackendCache>,
+    keyring_entry: State<'_, Option<Entry>>,
 ) -> Result<String, String> {
-    match get_login_page(&client, &selectors).await
+    let client = &aug_client.client;
+    let cookie_jar = &aug_client.cookies;
+
+    if cache.get_class_listing_state() == CacheDataState::Ok {
+        if let Some(guard) = cache.class_listing.data.try_lock().ok() {
+            if let Some(courses) = guard.as_ref() {
+                return Ok(
+                    base64::encode(
+                        bincode::serialize(courses).map_err(|e| format!("%{}", e))?
+                    )
+                );
+            }
+        }
+    }
+    
+    
+    match get_login_page(client).await
         .map_err(|err| err.to_string()) {
         Ok(login_form_details) => {
             login(
-                &client,
+                client,
                 creds,
                 cookie_jar,
                 keyring_entry,
@@ -70,7 +85,8 @@ pub async fn get_class_listing(
         .await
         .map_err(|e| e.to_string())?;
 
-    let active: ActiveClasses = serde_json::from_str(&active_courses_text).map_err(|e| e.to_string())?;
+    
+    let active: ActiveClasses = serde_json::from_str(active_courses_text.as_ref()).map_err(|e| e.to_string())?;
 
     let course_listing = active.body.courses.to_by_id();
 
@@ -83,41 +99,62 @@ pub async fn get_class_listing(
             id: ClassID(*nid),
             picture: Vec::new(),
         })
+        .chain([ClassEntry { name: "Bleep".into(), section: "P(A-D,E)".into(), id: ClassID(123456), picture: Vec::new() }].into_iter())
         .collect();
     
     courses.sort_unstable();
 
-    Ok(
-        base64::encode(
-            bincode::serialize(&courses).map_err(|e| format!("%{}", e))?
-        )
-    )
+    println!("Testpoint 1");
+    
+    let encoded_output = base64::encode(
+        bincode::serialize(&courses).map_err(|e| format!("%{}", e))?
+    );
+
+    println!("Testpoint 2");
+
+    match (cache.class_listing.prev_update.lock(), cache.class_listing.data.lock()) {
+        (Ok(mut prev_update), Ok(mut class_listing)) => {
+            *prev_update = SystemTime::now();
+            *class_listing = Some(courses);
+        },
+        (
+            update_res,
+            data_res,
+        ) => eprintln!("Cache lock poisoned: {:#?}\n{:#?}", update_res, data_res),
+    }
+
+    println!("Testpoint 3");
+
+    Ok(encoded_output)
 }
 
+// #[tauri::command]
+// code hard will implement later
+// for element in document.select(&assignment_selector) {
+//     let assignmentid = &element.value().attr("id").unwrap()[2..];
+//     let page = match get_assignment_page(tempclient, assignmentid.to_string()).await {
+//         Ok(res) => {
+//             let body = res.text().await.unwrap();
+//             println!("{:?}", body);
+//             Ok(body)
+//         }, 
+//         Err(e) => Err(e.to_string()),
+//     };
+
+//     println!("--------------ASSIGMENT-------------");
+//     println!("{:?}", page.unwrap());
+// }
+
 #[tauri::command]
-pub async fn parse_single_class_info(client: State<'_, Client>, classid: String) -> Result<String, String> {
-    let tempclient = &*client;
+pub async fn parse_single_class_info(client: State<'_, AugClient>, classid: String) -> Result<String, String> {
+    let tempclient = &client.client;
     match get_single_class(tempclient, classid).await {
         Ok(res) => { 
             let body = res.text().await.unwrap();
             let document = Html::parse_document(&body);
             // let discussion_selector = Selector::parse("tr.type-discussion").unwrap();
             let assignment_selector = Selector::parse("tr.type-assignment").unwrap();
-            for element in document.select(&assignment_selector) {
-                let assignmentid = &element.value().attr("id").unwrap()[2..];
-                let page = match get_assignment_page(tempclient, assignmentid.to_string()).await {
-                    Ok(res) => {
-                        let body = res.text().await.unwrap();
-                        println!("{:?}", body);
-                        Ok(body)
-                    }, 
-                    Err(e) => Err(e.to_string()),
-                };
-
-                println!("--------------ASSIGMENT-------------");
-                println!("{:?}", page.unwrap());
-            }
-
+        
             Ok(body)
         },
         Err(e) => Err(e.to_string()),

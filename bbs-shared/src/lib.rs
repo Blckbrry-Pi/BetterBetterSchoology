@@ -2,6 +2,8 @@ pub mod reducer_actions;
 pub mod state;
 
 pub mod data;
+pub mod events;
+pub mod cache;
 
 use serde::{Serialize, Deserialize};
 

@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@tauri-apps/api": "^1.0.0-rc.6"
+  }
+}

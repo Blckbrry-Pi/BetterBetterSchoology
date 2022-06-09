@@ -68,7 +68,7 @@ pub struct BreadcrumbsProps {
 #[function_component(Breadcrumbs)]
 pub fn breadcrumbs(props: &BreadcrumbsProps) -> Html {
     html! {
-        <div>
+        <div class="pl-7 border-b-2 border-solid border-slate-500">
             {props.children.iter().chain([html! { <Breadcrumb on_click_callback={Callback::<()>::from(|_| ())} hidden=true key={props.children.len()}/> }].into_iter()).collect::<Vec<_>>()}
         </div>
     }

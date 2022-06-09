@@ -8,21 +8,52 @@ use crate::{ClassID, ClassItemID, DueDate, add_base64};
 
 pub type OptMutComponent<T> = Rc<RefCell<Option<T>>>;
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct Keyed<T>(T, usize);
+
+impl<T> Keyed<T> {
+    pub fn new_inc(&self, new_val: T) -> Self {
+        Keyed(new_val, self.1 + 1)
+    }
+
+    pub fn value(self) -> T {
+        self.0
+    }
+
+    pub fn key(&self) -> usize {
+        self.1
+    }
+}
+
+impl<T> Keyed<T>
+where T: Clone {
+    pub fn new_inc_clone(&self) -> Self {
+        Keyed(self.0.clone(), self.1 + 1)
+    }
+}
+
+impl<T> Deref for Keyed<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct FrontendData {
-    pub classes: OptMutComponent<Vec<ClassEntry>>,
-    pub curr_class_data: OptMutComponent<ClassPageData>,
+    pub classes: Keyed<OptMutComponent<Vec<ClassEntry>>>,
+    pub curr_class_data: Keyed<OptMutComponent<ClassPageData>>,
 }
 
 impl FrontendData {
     pub fn empty() -> Self {
         Self {
-            classes: Rc::new(RefCell::new(None)),
-            curr_class_data: Rc::new(RefCell::new(None)),
+            classes: Keyed(Rc::new(RefCell::new(None)), 0),
+            curr_class_data: Keyed(Rc::new(RefCell::new(None)), 0),
         }
     }
 }
-
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Properties)]
 pub struct ClassEntry {
