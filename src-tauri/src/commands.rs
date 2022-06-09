@@ -5,8 +5,9 @@ use keyring::Entry;
 use reqwest_cookie_store::CookieStoreMutex;
 use tauri::State;
 use reqwest::{Client, Method};
+use scraper::{Html, Selector};
 
-use crate::{requests::{get_login_page, Selectors, login, make_api_request, get_single_class}, Credentials, structs::ActiveClasses};
+use crate::{requests::{get_login_page, Selectors, login, make_api_request, get_single_class, get_assignment_page}, Credentials, structs::ActiveClasses};
 
 #[tauri::command]
 pub async fn set_credentials(creds: State<'_, Credentials>, username: String, password: String) -> Result<(), String> {
@@ -95,20 +96,29 @@ pub async fn get_class_listing(
 
 #[tauri::command]
 pub async fn parse_single_class_info(client: State<'_, Client>, classid: String) -> Result<String, String> {
-    match get_single_class(&*client, classid).await {
-        Ok(res) => {
-            let single_class_complete = res.text().await.unwrap();
-            
-            println!(single_class_complete)
-            Ok(body) {
-                // todo make this take listing of course assignments and return it
-                base64::encode(
-                    bincode::serialize(&courses).map_err(|e| format!("%{}", e))?
-                )
+    let tempclient = &*client;
+    match get_single_class(tempclient, classid).await {
+        Ok(res) => { 
+            let body = res.text().await.unwrap();
+            let document = Html::parse_document(&body);
+            // let discussion_selector = Selector::parse("tr.type-discussion").unwrap();
+            let assignment_selector = Selector::parse("tr.type-assignment").unwrap();
+            for element in document.select(&assignment_selector) {
+                let assignmentid = &element.value().attr("id").unwrap()[2..];
+                let page = match get_assignment_page(tempclient, assignmentid.to_string()).await {
+                    Ok(res) => {
+                        let body = res.text().await.unwrap();
+                        println!("{:?}", body);
+                        Ok(body)
+                    }, 
+                    Err(e) => Err(e.to_string()),
+                };
 
+                println!("--------------ASSIGMENT-------------");
+                println!("{:?}", page.unwrap());
             }
 
-            
+            Ok(body)
         },
         Err(e) => Err(e.to_string()),
     }
