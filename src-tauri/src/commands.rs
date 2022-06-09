@@ -3,9 +3,11 @@ use std::{collections::HashMap, sync::Arc, time::SystemTime};
 use bbs_shared::{ data::ClassEntry, ClassID, cache::{BackendCache, CacheDataState}, SectionID };
 use keyring::Entry;
 use tauri::State;
-use reqwest::Method;
+use reqwest::{Client, Method};
+use scraper::{Html, Selector};
 
-use crate::{requests::{get_login_page, login, make_api_request, get_single_class}, Credentials, structs::{ActiveClasses, AugClient}};
+use crate::{requests::{get_login_page, login, make_api_request, get_single_class, get_assignment_page}, Credentials, structs::{ActiveClasses, AugClient}};
+
 
 #[tauri::command]
 pub async fn set_credentials(creds: State<'_, Credentials>, username: String, password: String) -> Result<(), String> {
@@ -135,20 +137,34 @@ pub async fn get_class_listing(
     Ok(encoded_output)
 }
 
+// #[tauri::command]
+// code hard will implement later
+// for element in document.select(&assignment_selector) {
+//     let assignmentid = &element.value().attr("id").unwrap()[2..];
+//     let page = match get_assignment_page(tempclient, assignmentid.to_string()).await {
+//         Ok(res) => {
+//             let body = res.text().await.unwrap();
+//             println!("{:?}", body);
+//             Ok(body)
+//         }, 
+//         Err(e) => Err(e.to_string()),
+//     };
+
+//     println!("--------------ASSIGMENT-------------");
+//     println!("{:?}", page.unwrap());
+// }
+
 #[tauri::command]
 pub async fn parse_single_class_info(client: State<'_, AugClient>, classid: String) -> Result<String, String> {
-    match get_single_class(&client.client, classid).await {
-        Ok(res) => {
-            let single_class_complete = res.text().await.unwrap();
-            Ok({
-                // todo make this take listing of course assignments and return it
-                base64::encode(
-                    bincode::serialize(&single_class_complete).map_err(|e| format!("%{}", e))?
-                )
-
-            })
-
-            
+    let tempclient = &client.client;
+    match get_single_class(tempclient, classid).await {
+        Ok(res) => { 
+            let body = res.text().await.unwrap();
+            let document = Html::parse_document(&body);
+            // let discussion_selector = Selector::parse("tr.type-discussion").unwrap();
+            let assignment_selector = Selector::parse("tr.type-assignment").unwrap();
+        
+            Ok(body)
         },
         Err(e) => Err(e.to_string()),
     }

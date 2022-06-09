@@ -60,7 +60,5 @@ fn main() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 
-
-    // parse_single_class_info(client.into(), "5271245315".to_string());
 }
 
