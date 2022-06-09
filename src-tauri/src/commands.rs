@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc, time::SystemTime};
 
-use bbs_shared::{ data::ClassEntry, ClassID, cache::{BackendCache, CacheDataState} };
+use bbs_shared::{ data::ClassEntry, ClassID, cache::{BackendCache, CacheDataState}, SectionID };
 use keyring::Entry;
 use tauri::State;
 use reqwest::Method;
@@ -91,13 +91,22 @@ pub async fn get_class_listing(
     let mut courses: Vec<_> = course_listing
         .data
         .iter()
-        .map(|(nid, course)| ClassEntry {
-            name: course.0.course_title.clone(),
-            section: course.1.section_title.as_str().into(),
+        .map(|(nid, (course, section))| ClassEntry {
+            name: course.course_title.clone(),
+            section: section.section_title.as_str().into(),
             id: ClassID(*nid),
+            section_nid: SectionID(section.nid),
             picture: Vec::new(),
+            instructors: None,
         })
-        .chain([ClassEntry { name: "Bleep".into(), section: "P(A-D,E)".into(), id: ClassID(123456), picture: Vec::new() }].into_iter())
+        .chain([ClassEntry {
+            name: "Test Class with Bad Section".into(),
+            section: "P(A-D,E)".into(),
+            id: ClassID(123456),
+            section_nid: SectionID(654321),
+            picture: Vec::new(),
+            instructors: None
+        }].into_iter())
         .collect();
     
     courses.sort_unstable();

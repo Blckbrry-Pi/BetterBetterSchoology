@@ -17,6 +17,9 @@ pub use data::FrontendData;
 pub struct ClassID(pub u64);
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
+pub struct SectionID(pub u64);
+
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct ClassItemID(pub u64);
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

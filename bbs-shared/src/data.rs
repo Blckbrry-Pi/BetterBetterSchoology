@@ -4,7 +4,7 @@ use std::cmp::Ordering::*;
 use serde::{Serialize, Deserialize};
 use yew::Properties;
 
-use crate::{ClassID, ClassItemID, DueDate, add_base64};
+use crate::{ClassID, ClassItemID, DueDate, add_base64, SectionID};
 
 pub type OptMutComponent<T> = Rc<RefCell<Option<T>>>;
 
@@ -61,6 +61,8 @@ pub struct ClassEntry {
     pub section: SectionData,
     pub picture: Vec<u8>,
     pub id: ClassID,
+    pub section_nid: SectionID,
+    pub instructors: Option<Vec<String>>,
 }
 
 impl PartialOrd for ClassEntry {
