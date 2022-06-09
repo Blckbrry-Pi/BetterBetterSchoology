@@ -145,6 +145,9 @@ pub async fn get_class_listing(
 //     println!("{:?}", page.unwrap());
 // }
 
+
+// TODO -- ANY ASSIGNMENTS THAT HAVE <br> </br> -- REMOVE FIRST <br> AND REPLACE END TAG WITH NEW LINE
+//         can probably also figure out a way to condense the selectors --> very messy right now, but like everything else, code hard will implement later
 #[tauri::command]
 pub async fn parse_single_class_info(client: State<'_, AugClient>, classid: String) -> Result<String, String> {
     let tempclient = &client.client;
@@ -152,9 +155,28 @@ pub async fn parse_single_class_info(client: State<'_, AugClient>, classid: Stri
         Ok(res) => { 
             let body = res.text().await.unwrap();
             let document = Html::parse_document(&body);
-            // let discussion_selector = Selector::parse("tr.type-discussion").unwrap();
+
+            // selecting all assignments
             let assignment_selector = Selector::parse("tr.type-assignment").unwrap();
-        
+            let info_selector = Selector::parse(".item-info").unwrap();
+
+            // getting specific parts of the assignment
+            let title_selector = Selector::parse(".item-title>a").unwrap();
+            let body_selector = Selector::parse(".item-body>p").unwrap();
+            let duedate_selector = Selector::parse(".item-subtitle>span").unwrap();
+            
+
+            let elements = document.select(&assignment_selector);
+            for assignment_container in elements{
+                let assignment = assignment_container.select(&info_selector).next().unwrap();
+                let title = assignment.select(&title_selector).next().unwrap();
+                let body = assignment.select(&body_selector).next().unwrap();
+                let id = title.value().attr("href").unwrap()[12..].to_string();
+                let due_date = assignment.select(&duedate_selector).next().unwrap();
+
+                println!("{:?} - {:?} ({:?})\n{:?}\n\n", title.inner_html(), id, due_date.inner_html(), body.inner_html());
+            }
+
             Ok(body)
         },
         Err(e) => Err(e.to_string()),
