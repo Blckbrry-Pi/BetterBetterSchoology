@@ -6,7 +6,7 @@ use tauri::State;
 use reqwest::{Client, Method};
 use scraper::{Html, Selector};
 
-use crate::{requests::{get_login_page, login, make_api_request, get_single_class, get_assignment_page}, Credentials, structs::{ActiveClasses, AugClient}};
+use crate::{requests::{get_login_page, login, make_api_request, get_single_class, get_assignment_page}, Credentials, structs::{ActiveClasses, AugClient, Assignment}};
 
 
 #[tauri::command]
@@ -174,19 +174,32 @@ pub async fn parse_single_class_info(client: State<'_, AugClient>, classid: Stri
             let body_selector = Selector::parse(".item-body>p").unwrap();
             let duedate_selector = Selector::parse(".item-subtitle>span").unwrap();
             
-
+            // gets all the assignments on the page
             let elements = document.select(&assignment_selector);
-            for assignment_container in elements{
-                let assignment = assignment_container.select(&info_selector).next().unwrap();
-                let title = assignment.select(&title_selector).next().unwrap();
-                let body = assignment.select(&body_selector).next().unwrap();
-                let id = title.value().attr("href").unwrap()[12..].to_string();
-                let due_date = assignment.select(&duedate_selector).next().unwrap();
+                
+            let assignments : Vec<_> = elements
+                .into_iter()
+                .map(|element| {
+                    let assignment = element.select(&info_selector).next().unwrap();
+                    let title = assignment.select(&title_selector).next().unwrap();
+                    let body = assignment.select(&body_selector).next().unwrap();
+                    let duedate = assignment.select(&duedate_selector).next().unwrap();
+                    let id = title.value().attr("href").unwrap()[12..].to_string();
+                    
+                    Assignment {
+                        id : id,
+                        title: title.inner_html(),
+                        body: body.inner_html(),
+                        duedate: duedate.inner_html(),
+                    }
+                })
+                .collect();
 
-                println!("{:?} - {:?} ({:?})\n{:?}\n\n", title.inner_html(), id, due_date.inner_html(), body.inner_html());
-            }
-
-            Ok(body)
+                return Ok(
+                    base64::encode(
+                        bincode::serialize(&assignments).map_err(|e| format!("%{}", e))?
+                    )
+                );
         },
         Err(e) => Err(e.to_string()),
     }
