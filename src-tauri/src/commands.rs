@@ -6,7 +6,7 @@ use tauri::State;
 use reqwest::Method;
 use scraper::{Html, Selector};
 
-use crate::{requests::{get_login_page, login, make_api_request, get_single_class, get_assignment_page}, Credentials, structs::{ActiveClasses, AugClient}};
+use crate::{requests::{get_login_page, login, make_api_request, get_single_class, get_assignment_page}, Credentials, structs::{ActiveClasses, AugClient, Assignment}};
 
 
 #[tauri::command]
@@ -183,6 +183,9 @@ pub async fn get_class_listing(
 //     println!("{:?}", page.unwrap());
 // }
 
+
+// TODO -- ANY ASSIGNMENTS THAT HAVE <br> </br> -- REMOVE FIRST <br> AND REPLACE END TAG WITH NEW LINE
+//         can probably also figure out a way to condense the selectors --> very messy right now, but like everything else, code hard will implement later
 #[tauri::command]
 pub async fn parse_single_class_info(client: State<'_, AugClient>, classid: String) -> Result<String, String> {
     let tempclient = &client.client;
@@ -190,10 +193,42 @@ pub async fn parse_single_class_info(client: State<'_, AugClient>, classid: Stri
         Ok(res) => { 
             let body = res.text().await.unwrap();
             let document = Html::parse_document(&body);
-            // let discussion_selector = Selector::parse("tr.type-discussion").unwrap();
+
+            // selecting all assignments
             let assignment_selector = Selector::parse("tr.type-assignment").unwrap();
-        
-            Ok(body)
+            let info_selector = Selector::parse(".item-info").unwrap();
+
+            // getting specific parts of the assignment
+            let title_selector = Selector::parse(".item-title>a").unwrap();
+            let body_selector = Selector::parse(".item-body>p").unwrap();
+            let duedate_selector = Selector::parse(".item-subtitle>span").unwrap();
+            
+            // gets all the assignments on the page
+            let elements = document.select(&assignment_selector);
+                
+            let assignments : Vec<_> = elements
+                .into_iter()
+                .map(|element| {
+                    let assignment = element.select(&info_selector).next().unwrap();
+                    let title = assignment.select(&title_selector).next().unwrap();
+                    let body = assignment.select(&body_selector).next().unwrap();
+                    let duedate = assignment.select(&duedate_selector).next().unwrap();
+                    let id = title.value().attr("href").unwrap()[12..].to_string();
+                    
+                    Assignment {
+                        id : id,
+                        title: title.inner_html(),
+                        body: body.inner_html(),
+                        duedate: duedate.inner_html(),
+                    }
+                })
+                .collect();
+
+                return Ok(
+                    base64::encode(
+                        bincode::serialize(&assignments).map_err(|e| format!("%{}", e))?
+                    )
+                );
         },
         Err(e) => Err(e.to_string()),
     }
