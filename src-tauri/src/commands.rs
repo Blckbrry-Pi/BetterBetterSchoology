@@ -1,9 +1,9 @@
 use std::{collections::HashMap, sync::Arc, time::SystemTime};
 
-use bbs_shared::{ data::ClassEntry, ClassID, cache::{BackendCache, CacheDataState}, SectionID };
+use bbs_shared::{ data::ClassEntry, ClassID, cache::{BackendCache, CacheDataState}, SectionID, errors::{CredSetError, LoginError} };
 use keyring::Entry;
 use tauri::State;
-use reqwest::{Client, Method};
+use reqwest::Method;
 use scraper::{Html, Selector};
 
 use crate::{requests::{get_login_page, login, make_api_request, get_single_class, get_assignment_page}, Credentials, structs::{ActiveClasses, AugClient}};
@@ -12,29 +12,55 @@ use crate::{requests::{get_login_page, login, make_api_request, get_single_class
 #[tauri::command]
 pub async fn set_credentials(creds: State<'_, Credentials>, username: String, password: String) -> Result<(), String> {
     match (creds.username.lock(), creds.password.lock()) {
-        (Ok(mut username_lock), Ok(mut password_lock)) => {
+        (
+            Ok(mut username_lock),
+            Ok(mut password_lock)
+        ) => {
             username_lock.clone_from(&Arc::new(username));
             password_lock.clone_from(&Arc::new(password));
-            Ok(())
+            return Ok(());
         },
 
-        (Err(username_error), Ok(_)) => {
-            eprintln!("Failed to get lock on username: {:#?}", username_error);
-            Err("CredSetErr".to_string())
-        },
+        (
+            Err(username_error),
+            Ok(_)
+        ) => eprintln!("Failed to get lock on username: {:#?}", username_error),
 
-        (Ok(_), Err(password_error)) => {
-            eprintln!("Failed to get lock on password: {:#?}", password_error);
-            Err("CredSetErr".to_string())
-        },
+        (
+            Ok(_),
+            Err(password_error)
+        ) => eprintln!("Failed to get lock on password: {:#?}", password_error),
 
-        (Err(username_error), Err(password_error)) => {
-            eprintln!("Failed to get lock on username and password: {:#?} {:#?}", username_error, password_error);
-            Err("CredSetErr".to_string())
-        },
+        (
+            Err(username_error),
+            Err(password_error)
+        ) => eprintln!("Failed to get lock on username and password: {:#?} {:#?}", username_error, password_error),
     }
+
+    Err(CredSetError.into())
 }
 
+
+pub async fn is_logged_in(
+    aug_client: State<'_, AugClient>,
+    cache: State<'_, BackendCache>,
+) -> Result<bool, LoginError> {
+
+    let client = &aug_client.client;
+
+    if cache.get_class_listing_state() == CacheDataState::Ok {
+        Ok(true)
+    } else {
+        match get_login_page(client).await {
+            Ok(_) => Ok(false),
+            Err(e) => match e {
+                LoginError::FindFormError => Ok(true), // TODO: Handle case where schoology is down.
+                _ => Err(e),
+            },
+        }
+    }
+   
+}
 
 #[tauri::command]
 pub async fn get_class_listing(
@@ -43,34 +69,39 @@ pub async fn get_class_listing(
     cache: State<'_, BackendCache>,
     keyring_entry: State<'_, Option<Entry>>,
 ) -> Result<String, String> {
+    
+    use bbs_shared::errors::LoginError::*;
+
     let client = &aug_client.client;
     let cookie_jar = &aug_client.cookies;
 
     if cache.get_class_listing_state() == CacheDataState::Ok {
         if let Some(guard) = cache.class_listing.data.try_lock().ok() {
             if let Some(courses) = guard.as_ref() {
-                return Ok(
-                    base64::encode(
-                        bincode::serialize(courses).map_err(|e| format!("%{}", e))?
-                    )
-                );
+                return Ok(base64::encode(
+                    bincode
+                        ::serialize(courses)
+                        .or::<String>(Err(SerializationError.into()))?,
+                ));
             }
         }
     }
     
-    
-    match get_login_page(client).await
-        .map_err(|err| err.to_string()) {
+    match get_login_page(client).await {
         Ok(login_form_details) => {
-            login(
+            match login(
                 client,
                 creds,
                 cookie_jar,
                 keyring_entry,
                 login_form_details,
-            ).await?;
+            ).await {
+                Ok(_) => (),
+                Err(e) => return Err(e.into())
+            }
         },
-        Err(_) => (),
+        Err(FindFormError) => (),
+        Err(e) => return Err(e.into()),
     };
 
     let active_courses_text = make_api_request(
@@ -80,13 +111,15 @@ pub async fn get_class_listing(
         &HashMap::<(), ()>::new(),
     )
         .await
-        .map_err(|e| e.to_string())?
+        .or::<String>(Err(LaterRequestError.into()))?
         .text()
         .await
-        .map_err(|e| e.to_string())?;
+        .or::<String>(Err(DecodeError.into()))?;
 
     
-    let active: ActiveClasses = serde_json::from_str(active_courses_text.as_ref()).map_err(|e| e.to_string())?;
+    let active: ActiveClasses = serde_json
+        ::from_str(active_courses_text.as_ref())
+        .or::<String>(Err(JsonError.into()))?;
 
     let course_listing = active.body.courses.to_by_id();
 
@@ -112,14 +145,12 @@ pub async fn get_class_listing(
         .collect();
     
     courses.sort_unstable();
-
-    println!("Testpoint 1");
     
     let encoded_output = base64::encode(
-        bincode::serialize(&courses).map_err(|e| format!("%{}", e))?
+        bincode
+            ::serialize(&courses)
+            .or::<String>(Err(SerializationError.into()))?,
     );
-
-    println!("Testpoint 2");
 
     match (cache.class_listing.prev_update.lock(), cache.class_listing.data.lock()) {
         (Ok(mut prev_update), Ok(mut class_listing)) => {
@@ -131,8 +162,6 @@ pub async fn get_class_listing(
             data_res,
         ) => eprintln!("Cache lock poisoned: {:#?}\n{:#?}", update_res, data_res),
     }
-
-    println!("Testpoint 3");
 
     Ok(encoded_output)
 }

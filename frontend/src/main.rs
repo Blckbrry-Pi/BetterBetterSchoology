@@ -2,10 +2,11 @@ use std::ops::Deref;
 
 use bbs_shared::StateUpdateAction;
 use bbs_shared::data::ClassEntry;
+use bbs_shared::errors::LoginError;
 use bbs_shared::{ PageState, FrontendData, DataUpdateAction };
 
 use frontend::{MainPage};
-use frontend::LoginPage;
+use frontend::{LoginPage, LoginOverlay};
 use frontend::{Breadcrumb, Breadcrumbs};
 
 use bincode::deserialize;
@@ -14,6 +15,7 @@ use base64::decode;
 use frontend::{get_class_listing_foreign, parse_single_class_info, reducer_contexts};
 
 use wasm_bindgen::JsValue;
+use web_sys::console::log_2;
 use yew::prelude::*;
 
 use wasm_bindgen_futures::spawn_local;
@@ -38,36 +40,44 @@ pub fn app() -> Html {
 
     let app_data = use_reducer_eq(FrontendData::empty);
 
-    {
-        if app_state.is_main() {
-            let app_data = app_data.clone();
-            let app_data2 = app_data.clone();
-            use_effect_with_deps(
-                move |_| get_class_listing(
-                    Callback::from(move |new_data| app_data2.dispatch(DataUpdateAction::SetClassListing(new_data)))
-                ),
-                ()
-            );
-
-        }
-    }
-
     let home_callback_app_state = app_state.clone();
 
     let home_callback: Callback<()> = (move |_| home_callback_app_state.dispatch(StateUpdateAction::ToMain)).into();
 
-    use PageState::{ Main, Login, LoginFailed, ClassPage, ClassItemPage };
+    use PageState::*;
 
     let inner = match app_state.deref() {
         Login {
             username,
             password,
         } => {
-            html! { <LoginPage username={username.clone()} password={password.clone()} /> }
+            html! { <>
+                <LoginOverlay loading=false key=0u8/>
+                <LoginPage username={username.clone()} password={password.clone()} />
+            </> }
         },
 
-        LoginFailed { .. } => {
-            html! { }
+        LoggingIn {
+            username,
+            password,
+        } => {
+            html! { <>
+                <LoginOverlay loading=true key=0u8/>
+                <LoginPage username={username.clone()} password={password.clone()} />
+            </> }
+        }
+
+        LoginFailed {
+            username,
+            password,
+            reason,
+        } => {
+            let return_app_state = app_state.clone();
+            log_2(&JsValue::from_str("Login Failed!"), &JsValue::from_str(&format!("{:?}", reason)));
+            html! { <>
+                <LoginOverlay error={*reason} return_to_login={Callback::from(move |_| return_app_state.dispatch(StateUpdateAction::ReturnLogin))} loading=false key=0u8/>
+                <LoginPage username={username.clone()} password={password.clone()} />
+            </> }
         },
 
         Main { day } => {
@@ -87,12 +97,14 @@ pub fn app() -> Html {
             };
             console::log_1(&JsValue::from_str(&format!("{:?}", app_data.classes)));
             console::log_1(&JsValue::from_bool(app_data.classes == FrontendData::empty().classes));
-            html! {
+            html! { <>
+                <LoginOverlay loading=false key=0u8/>
                 <div>
                     {breadcrumbs}
                     <MainPage day={*day} classes={app_data.classes.clone()} />
+                    <LoginOverlay loading=false/>
                 </div>
-            }
+            </>}
         },
         ClassPage {
             id,
@@ -124,57 +136,11 @@ pub fn app() -> Html {
     //     </ReducCtx<PageState>>
     // }
     
-    reducer_contexts! { PageState: app_state /* ,  FrontendData: app_data */ =>
-        <div class={"h-screen bg-slate-800 text-white overflow-scroll pl-7"}>
+    reducer_contexts! { PageState: app_state, FrontendData: app_data =>
+        <div class={"h-screen bg-slate-800 text-white overflow-scroll"}>
             {inner}
         </div>
     }
 }
 
-fn get_class_listing(data_handle: Callback<Vec<ClassEntry>>) -> impl FnOnce() {
-    async fn get_class_listing_guts(data_handle: Callback<Vec<ClassEntry>>) {
-        let opt_str = match get_class_listing_foreign().await {
-            Ok(val) => val.as_string(),
-            Err(err) => {
-                window()
-                    .unwrap()
-                    .alert_with_message(&format!("Recieved value error encountered: {:?}", err.as_string()))
-                    .unwrap();
-                return;
-            }
-        };
 
-        let data_str = match opt_str {
-            Some(s) => s,
-            None => panic!(),
-        };
-
-        let data_buf = match decode(&data_str) {
-            Ok(buf) => buf,
-            Err(err) => {
-                window()
-                    .unwrap()
-                    .alert_with_message(&format!("Text: {}\nError: {:?}", &data_str, err))
-                    .unwrap();
-                return;
-            }
-        };
-
-        match deserialize(&data_buf) {
-            Ok(des_state) => {
-                data_handle.emit(des_state);
-            }
-            Err(err) => {
-                window()
-                    .unwrap()
-                    .alert_with_message(&format!("Text: {}\nError: {:?}", &data_str, err))
-                    .unwrap();
-            }
-        }
-    }
-
-    spawn_local({
-        get_class_listing_guts(data_handle)
-    });
-    || ()
-}

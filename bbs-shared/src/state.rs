@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 
-use crate::{ClassID, ClassItemID};
+use crate::{ClassID, ClassItemID, errors::LoginError};
 
 #[derive(Clone, Debug,Serialize, Deserialize, PartialEq, Eq)]
 pub enum PageState {
@@ -8,9 +8,14 @@ pub enum PageState {
         username: String,
         password: String,
     },
+    LoggingIn {
+        username: String,
+        password: String,
+    },
     LoginFailed {
         username: String,
         password: String,
+        reason: LoginError,
     },
     Main {
         day: Option<usize>

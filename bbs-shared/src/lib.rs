@@ -2,6 +2,7 @@ pub mod reducer_actions;
 pub mod state;
 
 pub mod data;
+pub mod errors;
 pub mod events;
 pub mod cache;
 

@@ -1,5 +1,6 @@
 use std::{error::Error, collections::HashMap, borrow::Cow, fmt::Display, ops::Deref, sync::Arc};
 
+use bbs_shared::errors::LoginError;
 use keyring::Entry;
 use reqwest::{Client, Response, Method};
 use reqwest_cookie_store::CookieStoreMutex;
@@ -36,20 +37,22 @@ impl Display for NotFoundError {
 
 impl Error for NotFoundError {}
 
-pub async fn get_login_page(client: &Client) -> Result<LoginFormDetails, Box<dyn Error + Send + Sync>> {
+pub async fn get_login_page(client: &Client) -> Result<LoginFormDetails, LoginError> {
+    use bbs_shared::errors::LoginError::*;
+
     let output = client
         .get("https://bca.schoology.com")
         .send()
         .await;
-    let res = output?;
-    let text = res.text().await?;
+    let res = output.or(Err(RequestError))?;
+    let text = res.text().await.or(Err(DecodeError))?;
     let document = Html::parse_document(&text);
     
     let forms = document.select(&LOGIN_FORM);
 
     let form_node = match forms.last() {
         Some(node) => node,
-        None => return Err(Box::new(NotFoundError { value: Cow::Borrowed("Failed to find form!") }))
+        None => return Err(FindFormError),
     };
 
     let method = form_node.value().attr("method").unwrap().to_owned();
@@ -78,7 +81,9 @@ pub async fn login(
     cookie_jar: &Arc<CookieStoreMutex>,
     keyring_entry: State<'_, Option<Entry>>,
     login_form_details: LoginFormDetails,
-) -> Result<Response, String> {
+) -> Result<(), LoginError> {
+    use LoginError::*;
+
     let form: Vec<(String, String)> = login_form_details
         .inputs()
         .iter()
@@ -125,35 +130,37 @@ pub async fn login(
     match response {
         Ok(res) => {
             let status = res.status();
-            
+
+
             if status.is_success() {
-                match cookie_jar.lock() {
-                    Ok(inner_jar) => {
-                        match bincode::serialize(&inner_jar.iter_unexpired().collect::<Vec<_>>()) {
-                            Ok(serialized_value)  => {
-                                let base_64_value = base64::encode(serialized_value);
-                                if let Some(keyring_entry) = &*keyring_entry {
-                                    if let Err(e) = keyring_entry.set_password(&base_64_value) {
-                                        eprintln!("Keyring failed to save password: {}", e);
+                let text = res.text().await.or(Err(DecodeError))?;
+                let index = text.find("aria-invalid");
+                if index.is_some() && text[index.unwrap()..index.unwrap() + 100].contains("unrecognized") {
+                    Err(InvalidCredsError)
+                } else {
+                    match cookie_jar.lock() {
+                        Ok(inner_jar) => {
+                            match bincode::serialize(&inner_jar.iter_unexpired().collect::<Vec<_>>()) {
+                                Ok(serialized_value)  => {
+                                    let base_64_value = base64::encode(serialized_value);
+                                    if let Some(keyring_entry) = &*keyring_entry {
+                                        if let Err(e) = keyring_entry.set_password(&base_64_value) {
+                                            eprintln!("Keyring failed to save cookies: {}", e);
+                                        }
                                     }
                                 }
+                                Err(e) => eprintln!("Failed to serialize cookies into binary: {}", e),
                             }
-                            Err(e) => eprintln!("Failed to serialize cookies into binary: {}", e),
-                        }
-                    },
-                    Err(e) => eprintln!("Failed to get lock on cookie jar: {}", e),
+                        },
+                        Err(e) => eprintln!("Failed to get lock on cookie jar: {}", e),
+                    }
+                    Ok(())
                 }
-                Ok(res)
             } else {
-                let text = res.text().await;
-                Err(format!(
-                    "RESERR: Request failed with status code {}!\n\nBody:\n{:?}",
-                    status,
-                    text.unwrap_or_else(|e| format!("FAILED TO READ BODY TO TEXT: {:?}", e)),
-                ))
+                Err(LaterRequestError)
             }
         },
-        Err(e) => Err(format!("REQERR: {}", e.to_string())),
+        Err(_) => Err(LaterRequestError),
     }
 }
 

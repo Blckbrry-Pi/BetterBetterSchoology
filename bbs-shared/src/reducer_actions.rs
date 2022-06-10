@@ -3,13 +3,16 @@ use std::rc::Rc;
 use yew::Reducible;
 
 use crate::data::{ClassEntry, ClassPageData};
+use crate::errors::LoginError;
 use crate::{ ClassID, ClassItemID };
 use crate::PageState;
 use crate::FrontendData;
 
+#[derive(Debug, Clone)]
 pub enum StateUpdateAction {
     ToLogin,
-    FailLogin,
+    FailLogin(LoginError),
+    LogIn,
     ReturnLogin,
     SetUname(String),
     SetPassw(String),
@@ -25,13 +28,37 @@ impl Reducible for PageState {
     type Action = StateUpdateAction;
     fn reduce(self: Rc<Self>, action: Self::Action) -> Rc<Self> {
         match action {
-            ToLogin => Rc::new(PageState::Login { username: String::new(), password: String::new() }),
-            FailLogin => Rc::new(PageState::LoginFailed { username: self.as_login_username().cloned().unwrap_or_default(), password: self.as_login_password().cloned().unwrap_or_default() }),
-            ReturnLogin => Rc::new(PageState::LoginFailed { username: self.as_login_username().cloned().unwrap_or_default(), password: self.as_login_password().cloned().unwrap_or_default() }),
-            SetUname(username) => Rc::new(PageState::Login { username, password: self.as_login_password().cloned().unwrap_or_default() }),
-            SetPassw(password) => Rc::new(PageState::Login { username: self.as_login_username().cloned().unwrap_or_default(), password }),
-            ToMain => Rc::new(PageState::Main { day: None }),
-            SetDayFilter(day) => Rc::new(PageState::Main { day: Some(day) }),
+            ToLogin => Rc::new(PageState::Login {
+                username: String::new(),
+                password: String::new(),
+            }),
+            FailLogin(reason) => Rc::new(PageState::LoginFailed {
+                username: self.as_login_username().cloned().unwrap_or_default(),
+                password: self.as_login_password().cloned().unwrap_or_default(),
+                reason,
+            }),
+            LogIn => Rc::new(PageState::LoggingIn {
+                username: self.as_login_username().cloned().unwrap_or_default(),
+                password: self.as_login_password().cloned().unwrap_or_default(),
+            }),
+            ReturnLogin => Rc::new(PageState::Login {
+                username: self.as_login_username().cloned().unwrap_or_default(),
+                password: self.as_login_password().cloned().unwrap_or_default(),
+            }),
+            SetUname(username) => Rc::new(PageState::Login {
+                username,
+                password: self.as_login_password().cloned().unwrap_or_default(),
+            }),
+            SetPassw(password) => Rc::new(PageState::Login {
+                username: self.as_login_username().cloned().unwrap_or_default(),
+                password,
+            }),
+            ToMain => Rc::new(PageState::Main {
+                day: None
+            }),
+            SetDayFilter(day) => Rc::new(PageState::Main {
+                day: Some(day)
+            }),
             ToClass(class_id) => Rc::new(PageState::ClassPage {
                 id: class_id,
                 expanded_folders: vec![],
