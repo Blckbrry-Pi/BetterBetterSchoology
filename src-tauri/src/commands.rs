@@ -6,8 +6,7 @@ use tauri::State;
 use reqwest::Method;
 use scraper::{Html, Selector};
 
-use crate::{requests::{get_login_page, login, make_api_request, get_single_class, get_assignment_page}, Credentials, structs::{ActiveClasses, AugClient, Assignment}};
-
+use crate::{requests::{get_login_page, login, make_api_request, get_single_class}, Credentials, structs::{ActiveClasses, AugClient, Assignment}};
 
 #[tauri::command]
 pub async fn set_credentials(creds: State<'_, Credentials>, username: String, password: String) -> Result<(), String> {
@@ -166,26 +165,11 @@ pub async fn get_class_listing(
     Ok(encoded_output)
 }
 
-// #[tauri::command]
-// code hard will implement later
-// for element in document.select(&assignment_selector) {
-//     let assignmentid = &element.value().attr("id").unwrap()[2..];
-//     let page = match get_assignment_page(tempclient, assignmentid.to_string()).await {
-//         Ok(res) => {
-//             let body = res.text().await.unwrap();
-//             println!("{:?}", body);
-//             Ok(body)
-//         }, 
-//         Err(e) => Err(e.to_string()),
-//     };
-
-//     println!("--------------ASSIGMENT-------------");
-//     println!("{:?}", page.unwrap());
-// }
-
 
 // TODO -- ANY ASSIGNMENTS THAT HAVE <br> </br> -- REMOVE FIRST <br> AND REPLACE END TAG WITH NEW LINE
 //         can probably also figure out a way to condense the selectors --> very messy right now, but like everything else, code hard will implement later
+
+// currently, this returns a vector of 2 vectors, with the first vector containing all assignments w/ due dates, and the second containing all files/links under a given class page
 #[tauri::command]
 pub async fn parse_single_class_info(client: State<'_, AugClient>, classid: String) -> Result<String, String> {
     let tempclient = &client.client;
@@ -194,42 +178,113 @@ pub async fn parse_single_class_info(client: State<'_, AugClient>, classid: Stri
             let body = res.text().await.unwrap();
             let document = Html::parse_document(&body);
 
-            // selecting all assignments
-            let assignment_selector = Selector::parse("tr.type-assignment").unwrap();
-            let info_selector = Selector::parse(".item-info").unwrap();
+            // get all assignments for a class --> need to make document copies b/c of borrow checker
+            let assign_doc = document.clone();
+            let assignments = assignment_data(assign_doc);
 
-            // getting specific parts of the assignment
-            let title_selector = Selector::parse(".item-title>a").unwrap();
-            let body_selector = Selector::parse(".item-body>p").unwrap();
-            let duedate_selector = Selector::parse(".item-subtitle>span").unwrap();
-            
-            // gets all the assignments on the page
-            let elements = document.select(&assignment_selector);
-                
-            let assignments : Vec<_> = elements
-                .into_iter()
-                .map(|element| {
-                    let assignment = element.select(&info_selector).next().unwrap();
-                    let title = assignment.select(&title_selector).next().unwrap();
-                    let body = assignment.select(&body_selector).next().unwrap();
-                    let duedate = assignment.select(&duedate_selector).next().unwrap();
-                    let id = title.value().attr("href").unwrap()[12..].to_string();
-                    
-                    Assignment {
-                        id : id,
-                        title: title.inner_html(),
-                        body: body.inner_html(),
-                        duedate: duedate.inner_html(),
-                    }
-                })
-                .collect();
+            // get all "documents" (pdfs, word docs, etc) and links for a class
+            let file_doc = document.clone();
+            let files = file_data(file_doc);
 
-                return Ok(
-                    base64::encode(
-                        bincode::serialize(&assignments).map_err(|e| format!("%{}", e))?
-                    )
-                );
+            let all_materials = vec![assignments, files];
+
+            return Ok(
+                base64::encode(
+                    bincode::serialize(&all_materials).map_err(|e| format!("%{}", e))?
+                )
+            );
         },
         Err(e) => Err(e.to_string()),
     }
+}
+
+pub fn assignment_data (document : Html) -> Vec<Assignment> {
+    // selecting all assignments
+    let assignment_selector = Selector::parse("tr.type-assignment").unwrap();
+    let all_assignments = document.select(&assignment_selector);
+
+    // getting specific parts of the assignment
+    let title_selector = Selector::parse(".item-title>a").unwrap();
+    let body_selector = Selector::parse(".item-body>p").unwrap();
+    let duedate_selector = Selector::parse(".item-subtitle>span").unwrap();
+    let info_selector = Selector::parse(".item-info").unwrap();
+
+    let assignments : Vec<_> = all_assignments
+        .into_iter()
+        .map(|element| {
+            let assignment = element.select(&info_selector).next().unwrap();
+            let title = assignment.select(&title_selector).next().unwrap();
+            let body = assignment.select(&body_selector).next().unwrap();
+            let id = title.value().attr("href").unwrap()[12..].to_string();
+
+            let duedate = assignment.select(&duedate_selector).next();
+            let duedate = match duedate {
+                Some(duedate) => duedate.inner_html(),
+                None => "No Due Date Specified".to_string(),
+            };
+
+            Assignment {
+                id : id,
+                kind : "".to_string(),
+                title: title.inner_html(),
+                body: body.inner_html(),
+                duedate: duedate,
+            }
+        })
+        .collect();
+
+        assignments
+}
+
+
+// may need to dbl check to see if there are no files or not -- not sure if this will cause issue
+pub fn file_data (document : Html) -> Vec<Assignment> {
+    let document_selector = Selector::parse("tr.type-document").unwrap();
+    let all_attachments = document.select(&document_selector);
+    let file_selector = Selector::parse(".attachments-file-name ").unwrap();
+    let link_selector = Selector::parse(".attachments-link>a").unwrap();
+
+    // either attachments-link or attachments-file
+
+    let title_selector = Selector::parse("a").unwrap();
+    let extra_title_selector = Selector::parse("a>span").unwrap();
+
+    let docs : Vec<_> = all_attachments
+        .into_iter()
+        .map(|element| {
+            let id = element.value().attr("id").unwrap()[12..].to_string();
+            if(element.inner_html().contains("attachments-file")){
+                // file case    
+                let el = element.select(&file_selector).next().unwrap();
+                let mut title = el.select(&title_selector).next().unwrap();
+                let actual_title : String;
+                if(title.inner_html().contains("<span ")){
+                    title = title.select(&extra_title_selector).next().unwrap();
+                    actual_title = title.inner_html().split("<span ").collect::<Vec<&str>>()[0].to_string();
+                } else {
+                    actual_title = title.inner_html();
+                }
+
+                Assignment {
+                    id : id,
+                    kind : "file".to_string(),
+                    title: actual_title,
+                    body: "".to_string(),
+                    duedate : "No Due Date Specified".to_string(),
+                }
+            } else {
+                // link case
+                let el = element.select(&link_selector).next().unwrap();
+                Assignment {
+                    id : id,
+                    kind : "link".to_string(),
+                    title: el.inner_html(),
+                    body: "".to_string(),
+                    duedate : "No Due Date Specified".to_string(),
+                }
+            }            
+        })
+        .collect();
+    
+    docs
 }

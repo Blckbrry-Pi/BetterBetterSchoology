@@ -87,6 +87,7 @@ pub struct AugClient {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Assignment {
     pub id : String,
+    pub kind : String, // what type of thing it is... assignment, discussion, folder, etc.
     pub title : String,
     pub body : String,
     pub duedate : String
