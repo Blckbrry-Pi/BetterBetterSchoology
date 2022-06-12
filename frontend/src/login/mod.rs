@@ -88,7 +88,7 @@ pub fn login_page(props: &LoginDataPageProps) -> Html {
                     let _ = get_class_listing(
                         Callback::from(move |new_data| {
                             app_state_for_entering.dispatch(StateUpdateAction::ToMain);
-                            app_data.dispatch(DataUpdateAction::SetClassListing(new_data))
+                            app_data.dispatch(DataUpdateAction::SetClassListing(new_data));
                         }),
                         Callback::from(move |error| app_state_for_failing.dispatch(StateUpdateAction::FailLogin(error))),
                     );
@@ -143,9 +143,9 @@ const FLEX_COLUMN_CENTER: &str = "flex flex-col items-center justify-center";
 
 const ERROR_BASE: &str = build_classes!(
     "h-screen w-screen fixed top-0",
-    "backdrop-blur-md bg-slate-200",
+    "bg-slate-200",
     FLEX_COLUMN_CENTER,
-    "transition-[opacity,filter,backdrop-filter,-webkit-backdrop-filter] transition duration-300 ease-in-out",
+    "transition-[background-opacity,opacity,background-color,filter,backdrop-filter,-webkit-backdrop-filter] duration-500 ease-in-out",
 );
 const SHOW_ERROR: &str = build_classes!(
     ERROR_BASE,
@@ -153,19 +153,17 @@ const SHOW_ERROR: &str = build_classes!(
 );
 const HIDE_ERROR: &str = build_classes!(
     ERROR_BASE,
-    "bg-opacity-0 backdrop-blur-none -z-50",
+    "bg-opacity-0 backdrop-blur-none pointer-events-none",
 );
 
 const INNER_BASE: &str = build_classes!(
     FLEX_COLUMN_CENTER,
     "transition-opacity duration-300 ease-in-out",
 );
-
 const SHOW_INNER: &str = build_classes!(
     INNER_BASE,
     "opacity-100",
 );
-
 const HIDE_INNER: &str = build_classes!(
     INNER_BASE,
     "opacity-0",

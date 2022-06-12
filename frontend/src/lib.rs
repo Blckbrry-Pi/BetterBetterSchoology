@@ -7,8 +7,8 @@ use bbs_shared::{data::ClassEntry, errors::LoginError};
 use bincode::deserialize;
 pub use main_page::MainPage;
 
-pub use login::{ LoginPage, LoginOverlay };
-pub use breadcrumbs::{ Breadcrumbs, Breadcrumb };
+pub use login::{ LoginPage, LoginOverlay, LoginOverlayProps };
+pub use breadcrumbs::{ Breadcrumbs, Breadcrumb, BreadcrumbProps };
 
 
 use wasm_bindgen::prelude::*;
@@ -41,14 +41,17 @@ macro_rules! reducer_contexts {
 
 #[wasm_bindgen(module = "/public/glue.js")]
 extern "C" {
-    #[wasm_bindgen(js_name = invokeGetClassListing, catch)]
-    pub async fn get_class_listing_foreign() -> Result<JsValue, JsValue>;
+    #[wasm_bindgen(js_name = invokeIsLoggedIn, catch)]
+    pub async fn is_logged_in_foreign() -> Result<JsValue, JsValue>;
     #[wasm_bindgen(js_name = invokeSetCredentials, catch)]
     pub async fn set_credentials_foreign(username: String, password: String) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(js_name = invokeGetClassListing, catch)]
+    pub async fn get_class_listing_foreign() -> Result<JsValue, JsValue>;
     #[wasm_bindgen(js_name = parseSingleClassInfo, catch)]
     pub async fn parse_single_class_info(classid: String) -> Result<JsValue, JsValue>;
 }
-fn get_class_listing(data_callback: Callback<Vec<ClassEntry>>, error_callback: Callback<LoginError>) -> impl FnOnce() {
+pub fn get_class_listing(data_callback: Callback<Vec<ClassEntry>>, error_callback: Callback<LoginError>) {
     async fn get_class_listing_guts(data_callback: Callback<Vec<ClassEntry>>, error_callback: Callback<LoginError>) {
         let opt_str = match get_class_listing_foreign().await {
             Ok(val) => val.as_string(),
@@ -100,5 +103,21 @@ fn get_class_listing(data_callback: Callback<Vec<ClassEntry>>, error_callback: C
     spawn_local({
         get_class_listing_guts(data_callback, error_callback)
     });
-    || ()
+}
+
+pub async fn is_logged_in() -> bool {
+    let string = match is_logged_in_foreign().await {
+        Ok(js_val) => match js_val.as_string() {
+            Some(string) => string,
+            None => return false,
+        },
+        Err(_) => return false,
+    };
+
+    let buffer = match decode(&string) {
+        Ok(buffer) => buffer,
+        Err(_) => return false,
+    };
+
+    deserialize(&buffer).unwrap_or(false)
 }

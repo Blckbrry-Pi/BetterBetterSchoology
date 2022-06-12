@@ -16,3 +16,7 @@ export async function invokeSetCredentials(username, password) {
 export async function parseSingleClassInfo(classid) {
     return await invoke("parse_single_class_info", { classid });
 }
+
+export async function invokeIsLoggedIn() {
+    return await invoke("is_logged_in");
+}

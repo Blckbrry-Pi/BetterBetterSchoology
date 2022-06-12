@@ -1,5 +1,6 @@
-use bbs_shared::{data::{ClassEntry, SectionData, SectionDataGuts, OptMutComponent, Keyed}, PageState, StateUpdateAction};
-use yew::{function_component, Properties, html, Html, use_context, UseReducerHandle};
+use bbs_shared::{data::{ClassEntry, SectionData, SectionDataGuts, OptMutComponent, Keyed}, PageState, StateUpdateAction, ClassID};
+use web_sys::MouseEvent;
+use yew::{function_component, Properties, html, Html, use_context, UseReducerHandle, Callback};
 
 #[macro_export]
 macro_rules! build_classes {
@@ -13,10 +14,11 @@ macro_rules! build_classes {
     );
 }
 
-#[derive(Debug, Properties, PartialEq, Eq)]
+#[derive(Debug, Properties, PartialEq)]
 pub struct MainPageClassProps {
     pub entry: ClassEntry,
     pub enabled: bool,
+    pub into_class: Callback<ClassID>,  
 }
 
 const BOX_BASE: &str = build_classes!(
@@ -56,7 +58,7 @@ pub fn section_display(props: &SectionData) -> Html {
     let state = use_context::<UseReducerHandle<PageState>>().expect("no state ctx found");
 
     let day = if let &PageState::Main { day } = &*state { day } else {
-        unimplemented!("Section display is (currently) unimplemented for the state {:#?}", state);
+        return html! {};
     };
 
     let (days, period) = match &props.guts {
@@ -94,7 +96,12 @@ pub fn section_display(props: &SectionData) -> Html {
         }).collect::<Vec<Html>>();
 
     html! {
-        <div class="h-full inline-flex items-center justify-center flex-col px-1.5 w-28">
+        <div
+            class="h-full inline-flex items-center justify-center flex-col px-5 w-36"
+            onclick={|event: MouseEvent| {
+                event.prevent_default();
+                event.stop_propagation();
+            }}>
             <span class="font-title font-medium text-xl" >{"Per. "}{period}</span>
             <span class="pb-2">{if days != &[false; 7] {
                 html! {<div>{indicators}</div>}
@@ -164,7 +171,6 @@ const CLASS_BASE: &str = build_classes!(
     "bg-opacity-0 bg-zinc-500 hover:bg-opacity-25",
     "[transition:background_200ms_ease-in-out_0s,height_300ms_ease-in-out_0s,transform_300ms_ease-in-out_0s]",
     "rounded-xl overflow-hidden",
-    "ml-7",
 );
 const CLASS_SHOWING: &str = build_classes!(CLASS_BASE, "h-20 scale-y-100");
 const CLASS_HIDDEN: &str = build_classes!(CLASS_BASE, "h-0 scale-y-0");
@@ -179,18 +185,24 @@ pub fn main_page_class(props: &MainPageClassProps) -> Html {
         "before:border-gray-500 before:border-[1px]",
     );
 
+
     let name = &props.entry.name;
     let is_ungraded = name.starts_with('~');
     let without_tilde = name.strip_prefix('~').unwrap_or(name);
+    let id = props.entry.id;
+    let callback = props.into_class.clone();
+
     html! {
-        <div class={if props.enabled {CLASS_SHOWING} else {CLASS_HIDDEN}}>
+        <div
+            class={if props.enabled {CLASS_SHOWING} else {CLASS_HIDDEN}}
+            onclick={move |_| callback.clone().emit(id)}>
             <SectionDisplay guts={props.entry.section.guts.clone()} />
             <div class={MAIN_BODY}>
                 <span class="flex flex-row text-2xl text-gray150 items-center">
                     <GradeIndicator enabled={!is_ungraded}/>
                     {without_tilde}
                 </span>
-                <span class="text-sm text-gray-400 rounded">{props.entry.id.0}</span>
+                <span class="text-sm text-gray-400 rounded">{id.0}</span>
             </div>
         </div>
     }
@@ -204,7 +216,8 @@ pub struct MainPageProps {
 
 
 #[function_component(MainPage)]
-pub fn main(props: &MainPageProps) -> Html {
+pub fn main_page(props: &MainPageProps) -> Html {
+    let state = use_context::<UseReducerHandle<PageState>>().expect("no state ctx found");
     let day = props.day;
 
     let classes_ref = props.classes.borrow();
@@ -222,8 +235,15 @@ pub fn main(props: &MainPageProps) -> Html {
                             } else {false}
                         } else {true}
                     ))
-                    .map(|(entry, enabled)| html! {
-                        <MainPageClass entry={entry.clone()} enabled={enabled} key={entry.id.0}/>
+                    .map(|(entry, enabled)| {
+                        let state = state.clone();
+                        html! {
+                            <MainPageClass
+                                entry={entry.clone()}
+                                enabled={enabled}
+                                key={entry.id.0}
+                                into_class={Callback::from(move |id| state.clone().dispatch(StateUpdateAction::ToClass(id)))}/>
+                        }
                     })
                     .collect::<Html>()
             }

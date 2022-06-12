@@ -43,22 +43,29 @@ pub async fn set_credentials(creds: State<'_, Credentials>, username: String, pa
 pub async fn is_logged_in(
     aug_client: State<'_, AugClient>,
     cache: State<'_, BackendCache>,
-) -> Result<bool, LoginError> {
+) -> Result<String, String> {
+    use bbs_shared::errors::LoginError::SerializationError;
 
     let client = &aug_client.client;
 
-    if cache.get_class_listing_state() == CacheDataState::Ok {
+    let return_bool = if cache.get_class_listing_state() == CacheDataState::Ok {
         Ok(true)
     } else {
         match get_login_page(client).await {
             Ok(_) => Ok(false),
             Err(e) => match e {
                 LoginError::FindFormError => Ok(true), // TODO: Handle case where schoology is down.
-                _ => Err(e),
+                _ => Err::<_, String>(e.into()),
             },
         }
-    }
-   
+    }?;
+
+    
+    Ok(base64::encode(
+        bincode
+            ::serialize(&return_bool)
+            .or::<String>(Err(SerializationError.into()))?,
+    ))
 }
 
 #[tauri::command]
@@ -171,7 +178,10 @@ pub async fn get_class_listing(
 
 // currently, this returns a vector of 2 vectors, with the first vector containing all assignments w/ due dates, and the second containing all files/links under a given class page
 #[tauri::command]
-pub async fn parse_single_class_info(client: State<'_, AugClient>, classid: String) -> Result<String, String> {
+pub async fn parse_single_class_info(
+    client: State<'_, AugClient>,
+    classid: String
+) -> Result<String, String> {
     let tempclient = &client.client;
     match get_single_class(tempclient, classid).await {
         Ok(res) => { 
