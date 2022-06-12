@@ -253,12 +253,12 @@ pub fn file_data (document : Html) -> Vec<Assignment> {
         .into_iter()
         .map(|element| {
             let id = element.value().attr("id").unwrap()[12..].to_string();
-            if(element.inner_html().contains("attachments-file")){
+            if element.inner_html().contains("attachments-file") {
                 // file case    
                 let el = element.select(&file_selector).next().unwrap();
                 let mut title = el.select(&title_selector).next().unwrap();
                 let actual_title : String;
-                if(title.inner_html().contains("<span ")){
+                if title.inner_html().contains("<span ") {
                     title = title.select(&extra_title_selector).next().unwrap();
                     actual_title = title.inner_html().split("<span ").collect::<Vec<&str>>()[0].to_string();
                 } else {
@@ -266,7 +266,7 @@ pub fn file_data (document : Html) -> Vec<Assignment> {
                 }
 
                 Assignment {
-                    id : id,
+                    id,
                     kind : "file".to_string(),
                     title: actual_title,
                     body: "".to_string(),
@@ -276,7 +276,7 @@ pub fn file_data (document : Html) -> Vec<Assignment> {
                 // link case
                 let el = element.select(&link_selector).next().unwrap();
                 Assignment {
-                    id : id,
+                    id,
                     kind : "link".to_string(),
                     title: el.inner_html(),
                     body: "".to_string(),
