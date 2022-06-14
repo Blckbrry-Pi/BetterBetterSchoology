@@ -118,7 +118,14 @@ pub fn class_page(props: &ClassPageProps) -> Html {
     let material_html = match materials_ref.as_ref() {
         Some(a) => html! {
             {
-                a
+                if a.len() == 0 {
+                    html! {
+                        <div class="text-center text-gray-500">
+                            {"No materials found"}
+                        </div>
+                    }
+                } else {
+                    a
                     .iter()
                     .map(|entry| {
                         let state = state.clone();
@@ -131,6 +138,7 @@ pub fn class_page(props: &ClassPageProps) -> Html {
                         }
                     })
                     .collect::<Html>()
+                }
             }
         },
         None => html! {

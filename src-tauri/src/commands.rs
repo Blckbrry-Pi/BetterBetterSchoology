@@ -6,7 +6,7 @@ use tauri::State;
 use reqwest::{Method};
 use scraper::{Html, Selector};
 
-use crate::{requests::{get_login_page, login, make_api_request, get_single_class, get_material_info}, Credentials, structs::{ActiveClasses, AugClient}};
+use crate::{requests::{get_login_page, login, make_api_request, get_single_class, get_material_info, get_class_discussions}, Credentials, structs::{ActiveClasses, AugClient}};
 
 #[tauri::command]
 pub async fn set_credentials(creds: State<'_, Credentials>, username: String, password: String) -> Result<(), String> {
@@ -176,7 +176,7 @@ pub async fn get_class_listing(
 // TODO -- ANY ASSIGNMENTS THAT HAVE <br> </br> -- REMOVE FIRST <br> AND REPLACE END TAG WITH NEW LINE
 //         can probably also figure out a way to condense the selectors --> very messy right now, but like everything else, code hard will implement later
 
-// currently, this returns a vector of 2 vectors, with the first vector containing all assignments w/ due dates, and the second containing all files/links under a given class page
+// currently, this returns a vector of 3 vectors, with the first vector containing all assignments w/ due dates, and the second containing all files/links under a given class page, and the third containing all discussions
 // in the future, probably want to use filter view set to assignment to get all the assignments and stuff 
 #[tauri::command]
 pub async fn parse_single_class_info(
@@ -184,9 +184,9 @@ pub async fn parse_single_class_info(
     classid: String
 ) -> Result<String, String> {
     let tempclient = &client.client;
-    match get_single_class(tempclient, classid).await {
+    match get_single_class(tempclient, classid.clone()).await {
         Ok(res) => {
-            let (assignments, mut files) = {
+            let (assignments, mut files, mut discussions) = {
                 let body = res.text().await.unwrap();
                 let document = Html::parse_document(&body);
     
@@ -197,7 +197,12 @@ pub async fn parse_single_class_info(
                 // get all assignments for a class --> need to make document copies b/c of borrow checker
                 let assign_doc = document.clone();
                 let assignments = assignment_data(assign_doc);  
-                (files, assignments)
+                
+
+                // get all discussions for a class
+                let discuss_doc = document.clone();
+                let discussions = discussion_data(discuss_doc);
+                (files, assignments, discussions)
             };
             
             // lol files are assignments because i dont know how to name things -- i'll fix this later maybe hopefully 
@@ -217,7 +222,26 @@ pub async fn parse_single_class_info(
                 assignment.body = body;
             }
 
-            let all_materials = vec![assignments, files];
+            for element in discussions.iter_mut() {
+                let mut discussion = element;
+                let id = discussion.id.clone();
+                let disc = match get_class_discussions(tempclient, classid.clone(), id).await {
+                    Ok(res) => {
+                        Ok(res.text().await.unwrap())
+                    },
+                    Err(e) => Err(e.to_string()),
+                }.unwrap();
+                    
+                let discussion_page = Html::parse_document(&disc);
+                let discussion_body_selector = Selector::parse(".discussion-prompt").unwrap();
+                let body = discussion_page.select(&discussion_body_selector).next().map(|element| element.text().collect::<String>()).unwrap_or_default();
+                discussion.body = body;
+                
+            }
+
+            println!("{:?}", discussions);
+
+            let all_materials = vec![assignments, files, discussions];
 
             return Ok(
                 base64::encode(
@@ -246,9 +270,6 @@ pub fn assignment_data (document : Html) -> Vec<Assignment> {
         let title = assignment.select(&title_selector).next().unwrap();
         let id = title.value().attr("href").unwrap()[12..].to_string();
         
-        // TODO
-        let body = "".to_string();
-
         let duedate = assignment.select(&duedate_selector).next();
         let duedate = match duedate {
             Some(duedate) => duedate.inner_html(),
@@ -258,9 +279,9 @@ pub fn assignment_data (document : Html) -> Vec<Assignment> {
         assignments.push(
             Assignment {
                 id : id,
-                kind : "".to_string(),
+                kind : "assignment".to_string(),
                 title: title.inner_html(),
-                body: body.to_string(),
+                body: "".to_string(),
                 duedate: duedate,
             });
     }
@@ -318,4 +339,32 @@ pub fn file_data (document : Html) -> Vec<Assignment> {
         .collect();
     
     docs
+}
+
+pub fn discussion_data (document: Html) -> Vec<Assignment> {
+    let discussion_selector = Selector::parse("tr.type-discussion").unwrap();
+    let all_discussions = document.select(&discussion_selector);
+
+    // getting specific parts of the discussion
+    let title_selector = Selector::parse(".item-title>a").unwrap();
+    let info_selector = Selector::parse(".item-info").unwrap();
+    
+    let mut discussions = Vec::new();
+
+    for element in all_discussions {
+        let discussion = element.select(&info_selector).next().unwrap();
+        let title = discussion.select(&title_selector).next().unwrap();
+        let id = title.value().attr("href").unwrap()[45..].to_string();
+
+        discussions.push(
+            Assignment {
+                id,
+                kind : "discussion".to_string(),
+                title: title.inner_html(),
+                body: "".to_string(),
+                duedate : "No Due Date Specified".to_string(),
+            });
+    }
+
+    discussions
 }

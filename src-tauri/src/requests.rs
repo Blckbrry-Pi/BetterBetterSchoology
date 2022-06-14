@@ -187,3 +187,7 @@ pub async fn get_single_class(client: &Client, classid: String) -> Result<Respon
 pub async fn get_material_info(client: &Client, materialid: String) -> Result<Response, reqwest::Error> {
     client.get(format!("https://bca.schoology.com/assignment/{}/info", materialid)).send().await
 }
+
+pub async fn get_class_discussions(client: &Client, classid: String, discussionid: String) -> Result<Response, reqwest::Error> {
+    client.get(format!("https://bca.schoology.com/course/{}/materials/discussion/view/{}", classid, discussionid)).send().await
+}
