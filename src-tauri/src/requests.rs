@@ -1,6 +1,6 @@
 use std::{error::Error, collections::HashMap, borrow::Cow, fmt::Display, ops::Deref, sync::Arc};
 
-use bbs_shared::errors::LoginError;
+use bbs_shared::{errors::LoginError, MaterialID, ClassID};
 use keyring::Entry;
 use reqwest::{Client, Response, Method};
 use reqwest_cookie_store::CookieStoreMutex;
@@ -184,10 +184,10 @@ pub async fn get_single_class(client: &Client, classid: String) -> Result<Respon
     client.get(format!("https://bca.schoology.com/course/{}/materials", classid)).send().await
 }
 
-pub async fn get_material_info(client: &Client, materialid: String) -> Result<Response, reqwest::Error> {
-    client.get(format!("https://bca.schoology.com/assignment/{}/info", materialid)).send().await
+pub async fn get_class_discussions(client: &Client, classid: ClassID, discussionid: MaterialID) -> Result<Response, reqwest::Error> {
+    client.get(format!("https://bca.schoology.com/course/{}/materials/discussion/view/{}", classid.0, discussionid.0)).send().await
 }
 
-pub async fn get_class_discussions(client: &Client, classid: String, discussionid: String) -> Result<Response, reqwest::Error> {
-    client.get(format!("https://bca.schoology.com/course/{}/materials/discussion/view/{}", classid, discussionid)).send().await
+pub async fn get_material_info(client: &Client, materialid: MaterialID) -> Result<Response, reqwest::Error> {
+    client.get(format!("https://bca.schoology.com/assignment/{}/info", materialid.0)).send().await
 }

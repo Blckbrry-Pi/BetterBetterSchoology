@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc, time::SystemTime};
 
-use bbs_shared::{ data::{ClassEntry, Assignment}, ClassID, cache::{BackendCache, CacheDataState}, SectionID, errors::{CredSetError, LoginError} };
+use bbs_shared::{ data::{ClassEntry, Assignment}, ClassID, cache::{BackendCache, CacheDataState}, SectionID, errors::{CredSetError, LoginError}, MaterialID };
 use keyring::Entry;
 use tauri::State;
 use reqwest::{Method};
@@ -225,7 +225,7 @@ pub async fn parse_single_class_info(
             for element in discussions.iter_mut() {
                 let mut discussion = element;
                 let id = discussion.id.clone();
-                let disc = match get_class_discussions(tempclient, classid.clone(), id).await {
+                let disc = match get_class_discussions(tempclient, ClassID(u64::from_str_radix(&classid, 10).unwrap()), id).await {
                     Ok(res) => {
                         Ok(res.text().await.unwrap())
                     },
@@ -268,7 +268,7 @@ pub fn assignment_data (document : Html) -> Vec<Assignment> {
     for element in all_assignments {
         let assignment = element.select(&info_selector).next().unwrap();
         let title = assignment.select(&title_selector).next().unwrap();
-        let id = title.value().attr("href").unwrap()[12..].to_string();
+        let id = u64::from_str_radix(&title.value().attr("href").unwrap()[12..], 10).unwrap();
         
         let duedate = assignment.select(&duedate_selector).next();
         let duedate = match duedate {
@@ -278,7 +278,7 @@ pub fn assignment_data (document : Html) -> Vec<Assignment> {
 
         assignments.push(
             Assignment {
-                id : id,
+                id : MaterialID(id),
                 kind : "assignment".to_string(),
                 title: title.inner_html(),
                 body: "".to_string(),
@@ -304,7 +304,8 @@ pub fn file_data (document : Html) -> Vec<Assignment> {
     let docs : Vec<_> = all_attachments
         .into_iter()
         .map(|element| {
-            let id = element.value().attr("id").unwrap()[12..].to_string();
+            // println!("{:?}", element.value().attr("id"));
+            let id = u64::from_str_radix(&element.value().attr("id").unwrap()[2..], 10).unwrap();
             if element.inner_html().contains("attachments-file") {
                 // file case    
                 let el = element.select(&file_selector).next().unwrap();
@@ -318,7 +319,7 @@ pub fn file_data (document : Html) -> Vec<Assignment> {
                 }
 
                 Assignment {
-                    id,
+                    id: MaterialID(id),
                     kind : "file".to_string(),
                     title: actual_title,
                     body: "".to_string(),
@@ -328,7 +329,7 @@ pub fn file_data (document : Html) -> Vec<Assignment> {
                 // link case
                 let el = element.select(&link_selector).next().unwrap();
                 Assignment {
-                    id,
+                    id: MaterialID(id),
                     kind : "link".to_string(),
                     title: el.inner_html(),
                     body: "".to_string(),
@@ -354,11 +355,11 @@ pub fn discussion_data (document: Html) -> Vec<Assignment> {
     for element in all_discussions {
         let discussion = element.select(&info_selector).next().unwrap();
         let title = discussion.select(&title_selector).next().unwrap();
-        let id = title.value().attr("href").unwrap()[45..].to_string();
+        let id =  u64::from_str_radix(&title.value().attr("href").unwrap()[45..], 10).unwrap();
 
         discussions.push(
             Assignment {
-                id,
+                id : MaterialID(id),
                 kind : "discussion".to_string(),
                 title: title.inner_html(),
                 body: "".to_string(),

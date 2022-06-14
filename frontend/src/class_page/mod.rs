@@ -133,7 +133,7 @@ pub fn class_page(props: &ClassPageProps) -> Html {
                         html! {
                             <ClassPageMaterial
                                 assignment_data={entry.clone()}
-                                key={entry.id.clone()}
+                                key={entry.id.0}
                                 into_material_callback={Callback::from(move |id| state.clone().dispatch(StateUpdateAction::ToClassItem(id)))}/>
                         }
                     })
