@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc, time::SystemTime};
 
-use bbs_shared::{ data::{ClassEntry, Assignment}, ClassID, cache::{BackendCache, CacheDataState}, SectionID, errors::{CredSetError, LoginError}, MaterialID };
+use bbs_shared::{ data::{ClassEntry, Assignment, AssignmentType}, ClassID, cache::{BackendCache, CacheDataState}, SectionID, errors::{CredSetError, LoginError}, MaterialID };
 use keyring::Entry;
 use tauri::State;
 use reqwest::{Method};
@@ -279,10 +279,10 @@ pub fn assignment_data (document : Html) -> Vec<Assignment> {
         assignments.push(
             Assignment {
                 id : MaterialID(id),
-                kind : "assignment".to_string(),
+                kind : AssignmentType::Assignment,
                 title: title.inner_html(),
                 body: "".to_string(),
-                duedate: duedate,
+                duedate,
             });
     }
 
@@ -320,7 +320,7 @@ pub fn file_data (document : Html) -> Vec<Assignment> {
 
                 Assignment {
                     id: MaterialID(id),
-                    kind : "file".to_string(),
+                    kind : AssignmentType::File,
                     title: actual_title,
                     body: "".to_string(),
                     duedate : "No Due Date Specified".to_string(),
@@ -330,7 +330,7 @@ pub fn file_data (document : Html) -> Vec<Assignment> {
                 let el = element.select(&link_selector).next().unwrap();
                 Assignment {
                     id: MaterialID(id),
-                    kind : "link".to_string(),
+                    kind : AssignmentType::Link,
                     title: el.inner_html(),
                     body: "".to_string(),
                     duedate : "No Due Date Specified".to_string(),
@@ -360,7 +360,7 @@ pub fn discussion_data (document: Html) -> Vec<Assignment> {
         discussions.push(
             Assignment {
                 id : MaterialID(id),
-                kind : "discussion".to_string(),
+                kind : AssignmentType::Discussion,
                 title: title.inner_html(),
                 body: "".to_string(),
                 duedate : "No Due Date Specified".to_string(),

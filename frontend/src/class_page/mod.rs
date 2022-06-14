@@ -1,4 +1,4 @@
-use bbs_shared::{data::{ClassEntry, SectionData, SectionDataGuts, OptMutComponent, Keyed, Assignment}, PageState, StateUpdateAction, ClassID, MaterialID};
+use bbs_shared::{data::{ClassEntry, SectionData, SectionDataGuts, OptMutComponent, Keyed, Assignment, AssignmentType}, PageState, StateUpdateAction, ClassID, MaterialID};
 use web_sys::MouseEvent;
 use yew::{function_component, Properties, html, Html, use_context, UseReducerHandle, Callback};
 use web_sys::{window, console};
@@ -7,51 +7,25 @@ use crate::build_classes;
 
 #[derive(Debug, Properties, PartialEq)]
 pub struct MaterialTypeProps {
-    material_type: String,
+    material_type: AssignmentType,
 }
-
-const BOX_BASE: &str = build_classes!(
-    "w-4 h-4",
-    "inline-block",
-    "m-1.5px",
-    "rounded-sm",
-);
-
-const BOX_ANIM: &str = build_classes!(
-    "scale-100",
-    "hover:scale-110",
-    "transition-all",
-    "duration-150",
-    "hover:duration-75",
-);
-
-const NOTDAY_BASE: &str = build_classes!(
-    "bg-opacity-70 hover:bg-opacity-90",
-);
-
-const NOTDAY_MAIN: &str = build_classes!(BOX_BASE, NOTDAY_BASE, BOX_ANIM, );
-
-const BOX_ACTIVATED_NOTDAY: &str = build_classes!(NOTDAY_MAIN, "bg-blue-400");
-const BOX_DEACTIVATED_NOTDAY: &str = build_classes!(NOTDAY_MAIN, "bg-slate-500");
-
-const ISDAY_BASE: &str = build_classes!(
-    "bg-opacity-80 hover:bg-opacity-100",
-);
-const ISDAY_MAIN: &str = build_classes!(BOX_BASE, ISDAY_BASE, BOX_ANIM);
-
-const BOX_ACTIVATED_ISDAY: &str = build_classes!(ISDAY_MAIN, "bg-blue_400_saturated");
-const BOX_DEACTIVATED_ISDAY: &str = build_classes!(ISDAY_MAIN, "bg-slate-400");
 
 #[function_component(MaterialTypeDisplay)]
 pub fn material_type_display(props: &MaterialTypeProps) -> Html {
+    use AssignmentType::*;
     html! {
         <div
-            class="h-full inline-flex items-center justify-center flex-col px-5 w-36"
+            class="h-full inline-flex items-center justify-center flex-col px-5 w-36 align-middle"
             onclick={|event: MouseEvent| {
                 event.prevent_default();
                 event.stop_propagation();
             }}>
-            {"this is an "}{props.material_type.clone()}
+            {match props.material_type {
+                Assignment => html! { <img src="/img/assignment.png" class="w-10 h-10"/>},
+                Link => html! { <img src="/img/link.png" class="w-10 h-10"/>},
+                Discussion => html! { <img src="/img/discussion.png" class="w-10 h-10"/>},
+                File => html! { <img src="/img/file.png" class="w-10 h-10"/>},
+            }}
         </div>
     }
 }
@@ -79,6 +53,7 @@ pub fn class_page_material(props: &ClassPageMaterialProps) -> Html {
         "ml-5",
         "before:h-[80%] before:top-[10%] before:absolute before:-left-4",
         "before:border-gray-500 before:border-[1px]",
+        "align-middle",
     );
 
 
@@ -95,9 +70,9 @@ pub fn class_page_material(props: &ClassPageMaterialProps) -> Html {
             <MaterialTypeDisplay material_type={kind.clone()} />
             <div class={MAIN_BODY}>
                 <span class="flex flex-row text-2xl text-gray150 items-center">
-                    {title}
+                    {title}{"\u{a0}"}
                 </span>
-                <span class="text-sm text-gray-400 rounded">{body}</span>
+                <span class="text-sm text-gray-400 w-[50vw] overflow-hidden text-ellipsis block whitespace-nowrap">{body}{"\u{a0}"}</span>
             </div>
         </div>
     }
