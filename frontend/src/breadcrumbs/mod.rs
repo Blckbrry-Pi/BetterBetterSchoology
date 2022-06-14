@@ -95,7 +95,7 @@ pub struct BreadcrumbsProps {
 #[function_component(Breadcrumbs)]
 pub fn breadcrumbs(props: &BreadcrumbsProps) -> Html {
     html! {
-        <div class="pl-7 border-b-2 border-solid border-slate-500 sticky top-0">
+        <div class="pl-7 border-b-2 border-solid border-slate-500 sticky top-0 bg-slate-800 z-20">
             {
                 props.children
                     .iter()
