@@ -60,6 +60,7 @@ pub fn app() -> Html {
     }, ());
 
     let home_callback_app_state = app_state.clone();
+    let breadcrumb_callback_app_state = app_state.clone();
 
     let home_callback: Callback<()> = (move |_| home_callback_app_state.dispatch(StateUpdateAction::ToMain)).into();
 
@@ -263,8 +264,37 @@ pub fn app() -> Html {
         },
         ClassItemPage {
             id,
+            class_id,
             page_specific_data: _,
         } => {
+            let breadcrumb_state = breadcrumb_callback_app_state.clone();
+            let class_id = class_id.clone();
+            let class_name = app_data
+                .classes
+                .borrow()
+                .as_ref()
+                .map(
+                    |classes| classes
+                        .iter()
+                        .find(|entry| entry.id == class_id)
+                        .map(|entry| entry.name.clone())
+                )
+                .flatten()
+                .unwrap_or_else(|| id.0.to_string());
+
+            let material_name = app_data
+                .curr_class_data
+                .borrow()
+                .as_ref()
+                .map(
+                    |materials| materials
+                        .iter()
+                        .find(|entry| &entry.id == id)
+                        .map(|entry| entry.title.clone())
+                )
+                .flatten()
+                .unwrap_or_else(|| id.0.to_string());
+
             login_overlay_props = LoginOverlayProps {
                 loading: false,
                 error: None,
@@ -282,14 +312,16 @@ pub fn app() -> Html {
                 }),
                 props!(BreadcrumbProps {
                     // fhvUINEOFHGESN
-                    text: id.0.to_string(),
-                    on_click_callback: Callback::<()>::from(|_| ()),
+                    text: class_name,
+                    on_click_callback: Callback::<()>::from(move |_| breadcrumb_state.dispatch(StateUpdateAction::ToClass(class_id))),
+                    unbounded: true,
                 }),
                 props!(BreadcrumbProps {
                     // FHEUISNGFYESBNFGYESNGFYES
-                    text: id.0.to_string(),
+                    text: material_name,
                     on_click_callback: Callback::<()>::from(|_| ()),
                     has_next: false,
+                    unbounded: true,
                 }),
             ]);
 

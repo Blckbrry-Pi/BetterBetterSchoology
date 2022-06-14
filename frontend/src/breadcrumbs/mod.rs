@@ -34,6 +34,7 @@ const CRUMB_BASE_CLASSES: &str = build_classes!(
     "inline-flex items-center justify-center",
     "relative",
     "transition-all duration-300",
+    "px-2"
     // "border-2 border-solid border-slate-500 border-opacity-20",
 );
 
@@ -46,7 +47,7 @@ const CRUMB_HIDDEN_CLASSES: &str = build_classes!(
 const CRUMB_SHOWING_CLASSES: &str = build_classes!(
     CRUMB_BASE_CLASSES,
     "w-24",
-    "opacity-100 left-0",
+    "opacity-100 left-[0.75rem]",
 );
 
 const CRUMB_HIDDEN_UNBOUNDED_CLASSES: &str = build_classes!(
@@ -55,7 +56,7 @@ const CRUMB_HIDDEN_UNBOUNDED_CLASSES: &str = build_classes!(
 );
 const CRUMB_SHOWING_UNBOUNDED_CLASSES: &str = build_classes!(
     CRUMB_BASE_CLASSES,
-    "opacity-100 left-0",
+    "opacity-100 left-[0.75rem]",
 );
 
 #[function_component(Breadcrumb)]

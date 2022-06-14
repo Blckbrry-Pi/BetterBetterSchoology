@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use lazy_static::__Deref;
 use yew::Reducible;
 
 use crate::data::{ClassEntry, Assignment};
@@ -69,6 +70,11 @@ impl Reducible for PageState {
             }),
             ToClassItem(class_item_id) => Rc::new(PageState::ClassItemPage {
                 id: class_item_id,
+                class_id: if let Self::ClassPage{ id, .. } = self.deref() {
+                    *id
+                } else {
+                    unreachable!()
+                },
                 page_specific_data: (),
             }),
         }

@@ -28,6 +28,7 @@ pub enum PageState {
         expanded_folders: Vec<MaterialID>,
     },
     ClassItemPage {
+        class_id: ClassID,
         id: MaterialID,
         page_specific_data: (),
     },
