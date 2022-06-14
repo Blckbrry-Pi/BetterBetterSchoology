@@ -184,6 +184,6 @@ pub async fn get_single_class(client: &Client, classid: String) -> Result<Respon
     client.get(format!("https://bca.schoology.com/course/{}/materials", classid)).send().await
 }
 
-pub async fn get_assignment_page(client: &Client, assignmentid: String) -> Result<Response, reqwest::Error> {
-    client.get(format!("https://bca.schoology.com/assignment/{}/info", assignmentid)).send().await
+pub async fn get_material_info(client: &Client, materialid: String) -> Result<Response, reqwest::Error> {
+    client.get(format!("https://bca.schoology.com/assignment/{}/info", materialid)).send().await
 }
