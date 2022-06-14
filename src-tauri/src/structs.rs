@@ -84,7 +84,7 @@ pub struct AugClient {
     pub cookies: Arc<CookieStoreMutex>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Assignment {
     pub id : String,
     pub kind : String, // what type of thing it is... assignment, discussion, folder, etc.

@@ -3,10 +3,10 @@ use std::{collections::HashMap, sync::Arc, time::SystemTime};
 use bbs_shared::{ data::ClassEntry, ClassID, cache::{BackendCache, CacheDataState}, SectionID, errors::{CredSetError, LoginError} };
 use keyring::Entry;
 use tauri::State;
-use reqwest::Method;
+use reqwest::{Method};
 use scraper::{Html, Selector};
 
-use crate::{requests::{get_login_page, login, make_api_request, get_single_class}, Credentials, structs::{ActiveClasses, AugClient, Assignment}};
+use crate::{requests::{get_login_page, login, make_api_request, get_single_class, get_material_info}, Credentials, structs::{ActiveClasses, AugClient, Assignment}};
 
 #[tauri::command]
 pub async fn set_credentials(creds: State<'_, Credentials>, username: String, password: String) -> Result<(), String> {
@@ -170,21 +170,42 @@ pub async fn get_class_listing(
 //         can probably also figure out a way to condense the selectors --> very messy right now, but like everything else, code hard will implement later
 
 // currently, this returns a vector of 2 vectors, with the first vector containing all assignments w/ due dates, and the second containing all files/links under a given class page
+// in the future, probably want to use filter view set to assignment to get all the assignments and stuff 
 #[tauri::command]
 pub async fn parse_single_class_info(client: State<'_, AugClient>, classid: String) -> Result<String, String> {
     let tempclient = &client.client;
     match get_single_class(tempclient, classid).await {
-        Ok(res) => { 
-            let body = res.text().await.unwrap();
-            let document = Html::parse_document(&body);
+        Ok(res) => {
+            let (assignments, mut files) = {
+                let body = res.text().await.unwrap();
+                let document = Html::parse_document(&body);
+    
+                // get all "documents" (pdfs, word docs, etc) and links for a class
+                let file_doc = document.clone();
+                let files = file_data(file_doc);
+                
+                // get all assignments for a class --> need to make document copies b/c of borrow checker
+                let assign_doc = document.clone();
+                let assignments = assignment_data(assign_doc);  
+                (files, assignments)
+            };
+            
+            // lol files are assignments because i dont know how to name things -- i'll fix this later maybe hopefully 
+            for element in files.iter_mut() {
+                let mut assignment = element;
+                let id = assignment.id.clone();
+                let doc = match get_material_info(tempclient, id).await {
+                    Ok(res) => {
+                        Ok(res.text().await.unwrap())
+                    },
+                    Err(e) => Err(e.to_string()),
+                }.unwrap();
 
-            // get all assignments for a class --> need to make document copies b/c of borrow checker
-            let assign_doc = document.clone();
-            let assignments = assignment_data(assign_doc);
-
-            // get all "documents" (pdfs, word docs, etc) and links for a class
-            let file_doc = document.clone();
-            let files = file_data(file_doc);
+                let assignment_page = Html::parse_document(&doc);
+                let assignment_body_selector = Selector::parse(".info-body").unwrap();
+                let body = assignment_page.select(&assignment_body_selector).next().map(|element| element.text().collect::<String>()).unwrap_or_default();
+                assignment.body = body;
+            }
 
             let all_materials = vec![assignments, files];
 
@@ -205,37 +226,37 @@ pub fn assignment_data (document : Html) -> Vec<Assignment> {
 
     // getting specific parts of the assignment
     let title_selector = Selector::parse(".item-title>a").unwrap();
-    let body_selector = Selector::parse(".item-body>p").unwrap();
     let duedate_selector = Selector::parse(".item-subtitle>span").unwrap();
     let info_selector = Selector::parse(".item-info").unwrap();
 
-    let assignments : Vec<_> = all_assignments
-        .into_iter()
-        .map(|element| {
-            let assignment = element.select(&info_selector).next().unwrap();
-            let title = assignment.select(&title_selector).next().unwrap();
-            let body = assignment.select(&body_selector).next().unwrap();
-            let id = title.value().attr("href").unwrap()[12..].to_string();
+    let mut assignments = Vec::new();
 
-            let duedate = assignment.select(&duedate_selector).next();
-            let duedate = match duedate {
-                Some(duedate) => duedate.inner_html(),
-                None => "No Due Date Specified".to_string(),
-            };
+    for element in all_assignments {
+        let assignment = element.select(&info_selector).next().unwrap();
+        let title = assignment.select(&title_selector).next().unwrap();
+        let id = title.value().attr("href").unwrap()[12..].to_string();
+        
+        // TODO
+        let body = "".to_string();
 
+        let duedate = assignment.select(&duedate_selector).next();
+        let duedate = match duedate {
+            Some(duedate) => duedate.inner_html(),
+            None => "No Due Date Specified".to_string(),
+        };
+
+        assignments.push(
             Assignment {
                 id : id,
                 kind : "".to_string(),
                 title: title.inner_html(),
-                body: body.inner_html(),
+                body: body.to_string(),
                 duedate: duedate,
-            }
-        })
-        .collect();
+            });
+    }
 
-        assignments
+    assignments
 }
-
 
 // may need to dbl check to see if there are no files or not -- not sure if this will cause issue
 pub fn file_data (document : Html) -> Vec<Assignment> {
@@ -253,12 +274,12 @@ pub fn file_data (document : Html) -> Vec<Assignment> {
         .into_iter()
         .map(|element| {
             let id = element.value().attr("id").unwrap()[12..].to_string();
-            if(element.inner_html().contains("attachments-file")){
+            if element.inner_html().contains("attachments-file"){
                 // file case    
                 let el = element.select(&file_selector).next().unwrap();
                 let mut title = el.select(&title_selector).next().unwrap();
                 let actual_title : String;
-                if(title.inner_html().contains("<span ")){
+                if title.inner_html().contains("<span "){
                     title = title.select(&extra_title_selector).next().unwrap();
                     actual_title = title.inner_html().split("<span ").collect::<Vec<&str>>()[0].to_string();
                 } else {

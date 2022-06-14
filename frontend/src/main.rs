@@ -31,7 +31,7 @@ fn main() {
 
 #[function_component(App)]
 pub fn app() -> Html {
-    spawn_local(async { parse_single_class_info("5202064601".into()).await.unwrap(); });
+    spawn_local(async { parse_single_class_info("5202065511".into()).await.unwrap(); });
 
     let app_state = use_reducer_eq(|| PageState::Login {
         username: String::new(),
