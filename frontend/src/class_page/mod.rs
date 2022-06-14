@@ -83,7 +83,7 @@ pub fn class_page_material(props: &ClassPageMaterialProps) -> Html {
 
 
     let title = &props.assignment_data.title;
-    let id = MaterialID(u64::from_str_radix("0", 10).unwrap());
+    let id = props.assignment_data.id;
     let body = &props.assignment_data.body;
     let kind = &props.assignment_data.kind;
     let callback = props.into_material_callback.clone();
@@ -115,6 +115,8 @@ pub fn class_page(props: &ClassPageProps) -> Html {
 
     let materials_ref = props.materials.borrow();
     
+    console::log_1(&format!("{:?}", materials_ref).into());
+
     let material_html = match materials_ref.as_ref() {
         Some(a) => html! {
             {
@@ -129,12 +131,16 @@ pub fn class_page(props: &ClassPageProps) -> Html {
                     .iter()
                     .map(|entry| {
                         let state = state.clone();
-                        console::error_1(&format!("{:#?}", a).into());
+                        console::error_1(&format!("{:#?}", entry).into());
+
                         html! {
                             <ClassPageMaterial
                                 assignment_data={entry.clone()}
                                 key={entry.id.0}
-                                into_material_callback={Callback::from(move |id| state.clone().dispatch(StateUpdateAction::ToClassItem(id)))}/>
+                                into_material_callback={Callback::from(move |id: MaterialID| {
+                                    console::log_1(&id.0.into());
+                                    state.clone().dispatch(StateUpdateAction::ToClassItem(id))
+                                })}/>
                         }
                     })
                     .collect::<Html>()

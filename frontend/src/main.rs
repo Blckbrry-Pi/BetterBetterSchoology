@@ -1,6 +1,7 @@
 use std::ops::Deref;
 
-use bbs_shared::{StateUpdateAction, DataUpdateAction};
+use bbs_shared::data::Assignment;
+use bbs_shared::{StateUpdateAction, DataUpdateAction, MaterialID};
 use bbs_shared::{ PageState, FrontendData };
 
 use frontend::MainPage;
@@ -280,19 +281,35 @@ pub fn app() -> Html {
                     on_click_callback: home_callback,
                 }),
                 props!(BreadcrumbProps {
+                    // fhvUINEOFHGESN
                     text: id.0.to_string(),
                     on_click_callback: Callback::<()>::from(|_| ()),
                 }),
                 props!(BreadcrumbProps {
+                    // FHEUISNGFYESBNFGYESNGFYES
                     text: id.0.to_string(),
                     on_click_callback: Callback::<()>::from(|_| ()),
                     has_next: false,
                 }),
             ]);
+
+            let assignment : Assignment = app_data
+                .curr_class_data
+                .borrow()
+                .as_ref()
+                .unwrap()
+                .iter()
+                .find(|assignment| assignment.id == MaterialID(u64::from_str_radix(&id.0.to_string(), 10).unwrap()))
+                .unwrap()
+                .clone();
+
+
+            // THIS IS BAD BUT I LOVE CRAMMING DHJFSKHNIENGYUWGNFEYISUNGFYUIESGNYIUFNGESIUFGYESU
             html! {
                 <div>
-                    <h2>{"Class page!"}</h2>
-                    <p class="id">{id.0.to_string()}</p>
+                    <h1 style="text-align: center; padding-top:1.5%; padding-bottom:.5%; font-size: 20px;"><strong>{assignment.title}</strong></h1>
+                    <h6 style="text-align: center; padding-bottom:1.8%; font-size: 12px">{assignment.duedate}</h6>
+                    <p style="text-align: center;">{assignment.body}</p>
                 </div>
             }
         },
