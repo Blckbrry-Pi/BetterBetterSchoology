@@ -217,11 +217,18 @@ pub enum ClassItemEntryContents {
     Other {},
 }
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
+pub enum AssignmentType {
+    Assignment,
+    Link,
+    Discussion,
+    File,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Assignment {
     pub id : MaterialID,
-    pub kind : String, // what type of thing it is... assignment, discussion, folder, etc.
+    pub kind : AssignmentType, // what type of thing it is... assignment, discussion, folder, etc.
     pub title : String,
     pub body : String,
     pub duedate : String
