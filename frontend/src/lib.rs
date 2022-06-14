@@ -1,20 +1,22 @@
 mod login;
 mod breadcrumbs;
 mod main_page;
+mod class_page;
 
 use base64::decode;
-use bbs_shared::{data::ClassEntry, errors::LoginError};
+use bbs_shared::{data::ClassEntry, errors::LoginError, ClassID, FrontendData, PageState, StateUpdateAction, DataUpdateAction, SectionID};
 use bincode::deserialize;
-pub use main_page::MainPage;
 
 pub use login::{ LoginPage, LoginOverlay, LoginOverlayProps };
+pub use main_page::MainPage;
+pub use class_page::{ClassPage, ClassPageOverlay, ClassPageOverlayProps};
 pub use breadcrumbs::{ Breadcrumbs, Breadcrumb, BreadcrumbProps };
 
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::window;
-use yew::Callback;
+use web_sys::{window, console};
+use yew::{Callback, UseReducerHandle};
 
 #[macro_export]
 macro_rules! reducer_contexts {
@@ -120,4 +122,53 @@ pub async fn is_logged_in() -> bool {
     };
 
     deserialize(&buffer).unwrap_or(false)
+}
+
+pub fn dispatch_load_class(
+    ids: (ClassID, SectionID),
+    state_handle: UseReducerHandle<PageState>,
+    data_handle: UseReducerHandle<FrontendData>,
+) {
+    async fn dispatch_load_class_inner(
+        (id, section_id): (ClassID, SectionID),
+        state_handle: UseReducerHandle<PageState>,
+        data_handle: UseReducerHandle<FrontendData>,
+    ) {
+        console::log_1(&id.0.to_string().as_str().into());
+        let data = match parse_single_class_info(section_id.0.to_string()).await {
+            Ok(data) => {
+                if let Some(data) = data.as_string() {
+                    data
+                } else {
+                    console::error_2(&"step 2".into(), &data);
+                    state_handle.dispatch(StateUpdateAction::ToMain);
+                    return;
+                }
+            },
+            Err(err) => {
+                console::error_2(&"step 1".into(), &err);
+                state_handle.dispatch(StateUpdateAction::ToMain);
+                return;
+            }
+        };
+        let data = match decode(data) {
+            Ok(data) => data,
+            Err(err) => {
+                console::error_2(&"step 3".into(), &err.to_string().into());
+                state_handle.dispatch(StateUpdateAction::ToMain);
+                return;
+            }
+        };
+
+        match deserialize::<Vec<Vec<_>>>(&data) {
+            Ok(materials_data) => data_handle.dispatch(DataUpdateAction::SetClassPageInfo(materials_data.into_iter().flatten().collect())),
+            Err(err) => {
+                console::error_2(&"step 4".into(), &err.to_string().into());
+                state_handle.dispatch(StateUpdateAction::ToMain);
+                return;
+            }
+        }
+        state_handle.dispatch(StateUpdateAction::ToClass(id));
+    }
+    spawn_local(dispatch_load_class_inner(ids, state_handle, data_handle));
 }

@@ -10,6 +10,11 @@ pub struct BreadcrumbProps {
     pub has_next: bool,
     #[prop_or(false)]
     pub hidden: bool,
+
+    #[prop_or(false)]
+    pub hold_unbounded: bool,
+    #[prop_or(false)]
+    pub unbounded: bool,
 }
 
 const ARROW_BASE_CLASSES: &str = "h-2.5 w-2.5 border-r-2 border-t-2 rotate-45 transition-all duration-300";
@@ -25,7 +30,7 @@ const ARROW_HAS_NEXT_CLASSES: &str = build_classes!(
 );
 
 const CRUMB_BASE_CLASSES: &str = build_classes!(
-    "h8 w-24",
+    "h8",
     "inline-flex items-center justify-center",
     "relative",
     "transition-all duration-300",
@@ -34,17 +39,29 @@ const CRUMB_BASE_CLASSES: &str = build_classes!(
 
 const CRUMB_HIDDEN_CLASSES: &str = build_classes!(
     CRUMB_BASE_CLASSES,
+    "w-24",
     "opacity-0 left-[-0.75rem]",
 );
 
 const CRUMB_SHOWING_CLASSES: &str = build_classes!(
     CRUMB_BASE_CLASSES,
-    "opacity-100 left-0"
+    "w-24",
+    "opacity-100 left-0",
+);
+
+const CRUMB_HIDDEN_UNBOUNDED_CLASSES: &str = build_classes!(
+    CRUMB_BASE_CLASSES,
+    "opacity-0 left-[-0.75rem]",
+);
+const CRUMB_SHOWING_UNBOUNDED_CLASSES: &str = build_classes!(
+    CRUMB_BASE_CLASSES,
+    "opacity-100 left-0",
 );
 
 #[function_component(Breadcrumb)]
 pub fn breadcrumb(props: &BreadcrumbProps) -> Html {
     let text = use_state_eq(|| "Placeholder".to_string());
+    let unbounded = use_state_eq(|| false);
 
     {
         if let Some(prop_text) = &props.text {
@@ -54,10 +71,14 @@ pub fn breadcrumb(props: &BreadcrumbProps) -> Html {
         }
     }
 
+    if !props.hold_unbounded && !props.unbounded.eq(&unbounded.max(false)) {
+        unbounded.set(props.unbounded);
+    }
+
     let owned_callback = props.on_click_callback.clone();
     html! {
         <div
-            class={if props.hidden { CRUMB_HIDDEN_CLASSES } else { CRUMB_SHOWING_CLASSES } }
+            class={if unbounded.max(false) { if props.hidden { CRUMB_HIDDEN_UNBOUNDED_CLASSES } else { CRUMB_SHOWING_UNBOUNDED_CLASSES }} else { if props.hidden { CRUMB_HIDDEN_CLASSES } else { CRUMB_SHOWING_CLASSES } }}
             onclick={move |_| owned_callback.emit(())} >
             <span class="text-lg border-opacity-20">{text.as_str()}</span>
             <div class={if props.has_next { ARROW_HAS_NEXT_CLASSES } else { ARROW_NO_NEXT_CLASSES }}/>
@@ -81,10 +102,11 @@ pub fn breadcrumbs(props: &BreadcrumbsProps) -> Html {
                     .cloned()
                     .chain(
                         [
-                            props!(BreadcrumbProps { on_click_callback: Callback::<()>::from(|_| ()), hidden: true, has_next: false }),
+                            props!(BreadcrumbProps { on_click_callback: Callback::<()>::from(|_| ()), hidden: true, has_next: false, hold_unbounded: true, }),
                         ].into_iter(),
                     )
-                    .map(|props| html! { <Breadcrumb ..props /> })
+                    .enumerate()
+                    .map(|(idx, props)| html! { <Breadcrumb key={idx} ..props /> })
                     .collect::<Vec<_>>()
             }
         </div>

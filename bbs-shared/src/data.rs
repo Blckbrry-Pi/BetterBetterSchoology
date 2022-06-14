@@ -4,7 +4,7 @@ use std::cmp::Ordering::*;
 use serde::{Serialize, Deserialize};
 use yew::Properties;
 
-use crate::{ClassID, ClassItemID, DueDate, add_base64, SectionID};
+use crate::{ClassID, MaterialID, DueDate, add_base64, SectionID};
 
 pub type OptMutComponent<T> = Rc<RefCell<Option<T>>>;
 
@@ -43,7 +43,7 @@ impl<T> Deref for Keyed<T> {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct FrontendData {
     pub classes: Keyed<OptMutComponent<Vec<ClassEntry>>>,
-    pub curr_class_data: Keyed<OptMutComponent<ClassPageData>>,
+    pub curr_class_data: Keyed<OptMutComponent<Vec<Assignment>>>,
 }
 
 impl FrontendData {
@@ -182,7 +182,7 @@ impl SectionDataGuts {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Properties)]
 pub struct ClassPageData {
     id: ClassID,
-    entry_id_map: HashMap<ClassItemID, ClassItemEntryData>,
+    entry_id_map: HashMap<MaterialID, ClassItemEntryData>,
     hierarchy: Vec<ClassItemEntryData>,
 }
 
@@ -211,8 +211,18 @@ pub enum ClassItemEntryContents {
     },
 
     Folder {
-        contained: Option<Vec<ClassItemID>>
+        contained: Option<Vec<MaterialID>>
     },
 
     Other {},
+}
+
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct Assignment {
+    pub id : String,
+    pub kind : String, // what type of thing it is... assignment, discussion, folder, etc.
+    pub title : String,
+    pub body : String,
+    pub duedate : String
 }

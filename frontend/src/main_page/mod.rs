@@ -1,6 +1,8 @@
-use bbs_shared::{data::{ClassEntry, SectionData, SectionDataGuts, OptMutComponent, Keyed}, PageState, StateUpdateAction, ClassID};
+use bbs_shared::{data::{ClassEntry, SectionData, SectionDataGuts, OptMutComponent, Keyed}, PageState, StateUpdateAction, ClassID, FrontendData, SectionID};
 use web_sys::MouseEvent;
 use yew::{function_component, Properties, html, Html, use_context, UseReducerHandle, Callback};
+
+use crate::dispatch_load_class;
 
 #[macro_export]
 macro_rules! build_classes {
@@ -18,7 +20,7 @@ macro_rules! build_classes {
 pub struct MainPageClassProps {
     pub entry: ClassEntry,
     pub enabled: bool,
-    pub into_class: Callback<ClassID>,  
+    pub into_class: Callback<(ClassID, SectionID)>,  
 }
 
 const BOX_BASE: &str = build_classes!(
@@ -57,9 +59,7 @@ const BOX_DEACTIVATED_ISDAY: &str = build_classes!(ISDAY_MAIN, "bg-slate-400");
 pub fn section_display(props: &SectionData) -> Html {
     let state = use_context::<UseReducerHandle<PageState>>().expect("no state ctx found");
 
-    let day = if let &PageState::Main { day } = &*state { day } else {
-        return html! {};
-    };
+    let day = if let &PageState::Main { day } = &*state { day } else {None};
 
     let (days, period) = match &props.guts {
         SectionDataGuts::Bad(s) => return html! {
@@ -190,12 +190,13 @@ pub fn main_page_class(props: &MainPageClassProps) -> Html {
     let is_ungraded = name.starts_with('~');
     let without_tilde = name.strip_prefix('~').unwrap_or(name);
     let id = props.entry.id;
+    let section_id = props.entry.section_nid;
     let callback = props.into_class.clone();
 
     html! {
         <div
             class={if props.enabled {CLASS_SHOWING} else {CLASS_HIDDEN}}
-            onclick={move |_| callback.clone().emit(id)}>
+            onclick={move |_| callback.clone().emit((id, section_id))}>
             <SectionDisplay guts={props.entry.section.guts.clone()} />
             <div class={MAIN_BODY}>
                 <span class="flex flex-row text-2xl text-gray150 items-center">
@@ -218,6 +219,7 @@ pub struct MainPageProps {
 #[function_component(MainPage)]
 pub fn main_page(props: &MainPageProps) -> Html {
     let state = use_context::<UseReducerHandle<PageState>>().expect("no state ctx found");
+    let data = use_context::<UseReducerHandle<FrontendData>>().expect("no state ctx found");
     let day = props.day;
 
     let classes_ref = props.classes.borrow();
@@ -237,12 +239,16 @@ pub fn main_page(props: &MainPageProps) -> Html {
                     ))
                     .map(|(entry, enabled)| {
                         let state = state.clone();
+                        let data = data.clone();
                         html! {
                             <MainPageClass
                                 entry={entry.clone()}
                                 enabled={enabled}
                                 key={entry.id.0}
-                                into_class={Callback::from(move |id| state.clone().dispatch(StateUpdateAction::ToClass(id)))}/>
+                                into_class={Callback::from(move |(class_id, section_id)| {
+                                    state.dispatch(StateUpdateAction::LoadClass(class_id));
+                                    dispatch_load_class((class_id, section_id), state.clone(), data.clone());
+                                })}/>
                         }
                     })
                     .collect::<Html>()

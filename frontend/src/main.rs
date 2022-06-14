@@ -5,6 +5,7 @@ use bbs_shared::{ PageState, FrontendData };
 
 use frontend::MainPage;
 use frontend::{LoginPage, LoginOverlay, LoginOverlayProps};
+use frontend::{ClassPageOverlayProps, ClassPageOverlay};
 use frontend::{BreadcrumbProps, Breadcrumbs};
 
 use frontend::{is_logged_in, get_class_listing, parse_single_class_info, reducer_contexts};
@@ -25,7 +26,7 @@ fn main() {
 
 #[function_component(App)]
 pub fn app() -> Html {
-    spawn_local(async { parse_single_class_info("5202064601".into()).await.unwrap(); });
+    // spawn_local(async { parse_single_class_info("5202064601".into()).await.unwrap(); });
 
     let app_state = use_reducer_eq(|| PageState::LoggingIn {
         username: String::new(),
@@ -67,6 +68,7 @@ pub fn app() -> Html {
 
     let login_overlay_props;
     let breadcrumbs: Option<Vec<BreadcrumbProps>>;
+    let class_page_overlay_props;
 
     let inner = match app_state.deref() {
         Login {
@@ -79,6 +81,11 @@ pub fn app() -> Html {
                 return_to_login: None,
             };
             breadcrumbs = None;
+            class_page_overlay_props = ClassPageOverlayProps {
+                loading: false,
+                error: None,
+                return_to_login: None,
+            };
             html! { <>
                 <LoginPage username={username.clone()} password={password.clone()} />
             </> }
@@ -94,6 +101,11 @@ pub fn app() -> Html {
                 return_to_login: None,
             };
             breadcrumbs = None;
+            class_page_overlay_props = ClassPageOverlayProps {
+                loading: false,
+                error: None,
+                return_to_login: None,
+            };
             html! { <>
                 <LoginPage username={username.clone()} password={password.clone()} />
             </> }
@@ -111,6 +123,11 @@ pub fn app() -> Html {
                 return_to_login: Some(Callback::from(move |_| return_app_state.dispatch(StateUpdateAction::ReturnLogin))),
             };
             breadcrumbs = None;
+            class_page_overlay_props = ClassPageOverlayProps {
+                loading: false,
+                error: None,
+                return_to_login: None,
+            };
             html! { <>
                 <LoginPage username={username.clone()} password={password.clone()} />
             </> }
@@ -143,16 +160,33 @@ pub fn app() -> Html {
                     }),
                 ])
             };
+            class_page_overlay_props = ClassPageOverlayProps {
+                loading: false,
+                error: None,
+                return_to_login: None,
+            };
             html! { <>  
                 <div>
-                    <MainPage day={*day} classes={app_data.classes.clone()} />
+                    <MainPage day={*day} classes={app_data.classes.clone()} key=0u8/>
                 </div>
             </>}
         },
-        ClassPage {
-            id,
-            expanded_folders: _,
+        LoadingClass {
+            class_id,
         } => {
+            let class_name = app_data
+                .classes
+                .borrow()
+                .as_ref()
+                .map(
+                    |classes| classes
+                        .iter()
+                        .find(|entry| &entry.id == class_id)
+                        .map(|entry| entry.name.clone())
+                )
+                .flatten()
+                .unwrap_or_else(|| class_id.0.to_string());
+
             login_overlay_props = LoginOverlayProps {
                 loading: false,
                 error: None,
@@ -164,15 +198,65 @@ pub fn app() -> Html {
                     on_click_callback: home_callback,
                 }),
                 props!(BreadcrumbProps {
-                    text: id.0.to_string(),
+                    text: class_name,
                     on_click_callback: Callback::<()>::from(|_| ()),
                     has_next: false,
+                    unbounded: true,
                 }),
             ]);
+            class_page_overlay_props = ClassPageOverlayProps {
+                loading: true,
+                error: None,
+                return_to_login: None,
+            };
+            html! {
+                <MainPage day={None} classes={app_data.classes.clone()} key=0u8/>
+            }
+        },
+        ClassPage {
+            id,
+            expanded_folders: _,
+        } => {
+            let class_name = app_data
+                .classes
+                .borrow()
+                .as_ref()
+                .map(
+                    |classes| classes
+                        .iter()
+                        .find(|entry| &entry.id == id)
+                        .map(|entry| entry.name.clone())
+                )
+                .flatten()
+                .unwrap_or_else(|| id.0.to_string());
+
+            login_overlay_props = LoginOverlayProps {
+                loading: false,
+                error: None,
+                return_to_login: None,
+            };
+            breadcrumbs = Some(vec![
+                props!(BreadcrumbProps {
+                    text: "Home",
+                    on_click_callback: home_callback,
+                }),
+                props!(BreadcrumbProps {
+                    text: class_name,
+                    on_click_callback: Callback::<()>::from(|_| ()),
+                    has_next: false,
+                    unbounded: true,
+                }),
+            ]);
+            class_page_overlay_props = ClassPageOverlayProps {
+                loading: false,
+                error: None,
+                return_to_login: None,
+            };
+            use frontend::ClassPage;
             html! {
                 <div>
-                    <h2>{"Class page!"}</h2>
-                    <p class="id">{id.0.to_string()}</p>
+                    <ClassPage
+                        materials={app_data.curr_class_data.clone()}/>
                 </div>
             }
         },
@@ -181,6 +265,11 @@ pub fn app() -> Html {
             page_specific_data: _,
         } => {
             login_overlay_props = LoginOverlayProps {
+                loading: false,
+                error: None,
+                return_to_login: None,
+            };
+            class_page_overlay_props = ClassPageOverlayProps {
                 loading: false,
                 error: None,
                 return_to_login: None,
@@ -212,6 +301,7 @@ pub fn app() -> Html {
     reducer_contexts! { PageState: app_state, FrontendData: app_data =>
         <div class={"h-screen bg-slate-800 text-white overflow-scroll"}>
             <LoginOverlay ..login_overlay_props/>
+            <ClassPageOverlay ..class_page_overlay_props/>
             {if let Some(breadcrumbs) = breadcrumbs { html! {<Breadcrumbs children={breadcrumbs}/>} } else {  html! {} }}
             {inner}
         </div>

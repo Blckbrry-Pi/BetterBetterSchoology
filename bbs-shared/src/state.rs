@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 
-use crate::{ClassID, ClassItemID, errors::LoginError};
+use crate::{ClassID, MaterialID, errors::LoginError};
 
 #[derive(Clone, Debug,Serialize, Deserialize, PartialEq, Eq)]
 pub enum PageState {
@@ -20,12 +20,15 @@ pub enum PageState {
     Main {
         day: Option<usize>
     },
+    LoadingClass {
+        class_id: ClassID,
+    },
     ClassPage {
         id: ClassID,
-        expanded_folders: Vec<ClassItemID>,
+        expanded_folders: Vec<MaterialID>,
     },
     ClassItemPage {
-        id: ClassItemID,
+        id: MaterialID,
         page_specific_data: (),
     },
 }

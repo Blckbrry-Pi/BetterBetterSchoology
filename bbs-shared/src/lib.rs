@@ -21,7 +21,7 @@ pub struct ClassID(pub u64);
 pub struct SectionID(pub u64);
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
-pub struct ClassItemID(pub u64);
+pub struct MaterialID(pub u64);
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DueDate();

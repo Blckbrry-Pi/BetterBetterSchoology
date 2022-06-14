@@ -1,5 +1,5 @@
 use std::{collections::HashMap, sync::{Arc, Mutex}, time::{UNIX_EPOCH, SystemTime, Duration}};
-use crate::{data::{ClassPageData, ClassEntry, ClassItemEntryContents}, ClassID, ClassItemID};
+use crate::{data::{ClassPageData, ClassEntry, ClassItemEntryContents}, ClassID, MaterialID};
 
 pub type AMutComponent<T> = Arc<Mutex<T>>;
 
@@ -25,7 +25,7 @@ where T: Default {
 pub struct BackendCache {
     pub class_listing: TimedComponent<AMutComponent<Option<Vec<ClassEntry>>>>,
     pub class_data: AMutComponent<HashMap<ClassID, TimedComponent<ClassPageData>>>,
-    pub assignment_data: TimedComponent<Option<HashMap<ClassItemID, ClassItemEntryContents>>>,
+    pub assignment_data: TimedComponent<Option<HashMap<MaterialID, ClassItemEntryContents>>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

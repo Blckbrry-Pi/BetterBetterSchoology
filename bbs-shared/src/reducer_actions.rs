@@ -2,9 +2,9 @@ use std::rc::Rc;
 
 use yew::Reducible;
 
-use crate::data::{ClassEntry, ClassPageData};
+use crate::data::{ClassEntry, Assignment};
 use crate::errors::LoginError;
-use crate::{ ClassID, ClassItemID };
+use crate::{ ClassID, MaterialID };
 use crate::PageState;
 use crate::FrontendData;
 
@@ -18,8 +18,9 @@ pub enum StateUpdateAction {
     SetPassw(String),
     ToMain,
     SetDayFilter(usize),
+    LoadClass(ClassID),
     ToClass(ClassID),
-    ToClassItem(ClassItemID)
+    ToClassItem(MaterialID)
 }
 
 use StateUpdateAction::*;
@@ -59,6 +60,9 @@ impl Reducible for PageState {
             SetDayFilter(day) => Rc::new(PageState::Main {
                 day: Some(day)
             }),
+            LoadClass(class_id) => Rc::new(PageState::LoadingClass {
+                class_id,
+            }),
             ToClass(class_id) => Rc::new(PageState::ClassPage {
                 id: class_id,
                 expanded_folders: vec![],
@@ -76,7 +80,7 @@ pub enum DataUpdateAction {
     ClearClassListing,
     SetClassListing(Vec<ClassEntry>),
     ClearClassPageInfo,
-    SetClassPageInfo(ClassPageData),
+    SetClassPageInfo(Vec<Assignment>),
 }
 
 use DataUpdateAction::*;

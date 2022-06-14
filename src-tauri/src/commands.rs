@@ -1,12 +1,12 @@
 use std::{collections::HashMap, sync::Arc, time::SystemTime};
 
-use bbs_shared::{ data::ClassEntry, ClassID, cache::{BackendCache, CacheDataState}, SectionID, errors::{CredSetError, LoginError} };
+use bbs_shared::{ data::{ClassEntry, Assignment}, ClassID, cache::{BackendCache, CacheDataState}, SectionID, errors::{CredSetError, LoginError} };
 use keyring::Entry;
 use tauri::State;
 use reqwest::Method;
 use scraper::{Html, Selector};
 
-use crate::{requests::{get_login_page, login, make_api_request, get_single_class}, Credentials, structs::{ActiveClasses, AugClient, Assignment}};
+use crate::{requests::{get_login_page, login, make_api_request, get_single_class}, Credentials, structs::{ActiveClasses, AugClient}};
 
 #[tauri::command]
 pub async fn set_credentials(creds: State<'_, Credentials>, username: String, password: String) -> Result<(), String> {
